@@ -4,6 +4,8 @@
 > **用途**：防止 agent（或未来的你）去"修"一个没人打算修的东西，或者在不知情的情况下踩红线。
 > **未验证**：本次没有执行 `pnpm build` / `pnpm test` / 启动应用，所以"本来就红"的部分只记录了**结构事实**，实际红灯状态待第一次跑测试后补。
 
+产品定位、体验设计原则与分阶段特性路线见 [`../product/vision-design-and-roadmap.md`](../product/vision-design-and-roadmap.md)。本文继续负责具体技术债、验证记录与工程禁区，避免两处重复维护。
+
 ## 1. `CLAUDE.md` 版本信息全线过时（最高优先级）
 
 根 `CLAUDE.md` 是每次会话都会加载的常驻上下文，它的技术栈描述与现实严重不符：
@@ -173,6 +175,8 @@ pnpm --filter desktop test:types           # 34 error（既存，见 4b/4c）
 
 ### 9a. 三个开放问题（测出来了，但不擅自改）
 
+> **2026-11-27 更新：①②③ 已全部按目标行为修复**，见第 10 节。下面保留原始记录作为决策依据。
+
 #### ① Shuffle 模式没有在队列推进里处理
 
 `_nextTrackIndex` / `_prevTrackIndex` 的 `switch` 只写了 `Off` / `On` / `One`，`RepeatMode.Shuffle` 和 `RepeatMode.ShuffleOff` 落空 → 返回 `undefined`。
@@ -209,3 +213,68 @@ this.trackList.splice(Number(this._nextTrackIndex), 0, trackID)
 - `_scrobble` 的阈值判定（`progress > dt/1000/3`）——逻辑可测，但要伪造 `track.dt` 与 `trackListSource`
 - `nextTrack()` 的完整副作用链（`_setStateToLoading` → `_scrobble` → `pause` → `_playTrack`）
 - `shufflePlayList()`：依赖 `lodash.random`，需要固定随机源才能断言洗牌结果；当前只断言了"能来回切换"
+
+## 10. 播放器三件套落地记录（2026-11-27）
+
+产品路线 `docs/product/vision-design-and-roadmap.md` 阶段 1 第一批：状态可靠恢复、队列边界修复、音源失败生命周期。
+
+### 交付内容
+
+**新增 `web/utils/playerState.ts`**：持久化状态的逐字段校验（sanitize）。非法字段单独丢弃而非整体拒绝；音量 0（静音）合法保留；无 `__v` 的 legacy 数据与更新版本的数据按字段形状尽力恢复。`Player` 新增 `__v` 字段随序列化写入。
+
+**`web/utils/player.ts` 修复**：
+
+| 问题 | 原行为 | 现行为 |
+|---|---|---|
+| init() truthy 检查 | 音量 0 丢失、进度/原始队列不恢复 | 经 sanitize 逐字段恢复，音量走 setter 同步 Howler |
+| init() 笔误 | `if (params.state) this.trackList = params.state` | 已删除（sanitize 不读 state） |
+| shuffle 恢复 | 调 `shufflePlayList()` 重洗，originTrackList 未恢复时**清空队列** | 直接还原已洗好的 trackList + originTrackList，不重洗 |
+| 进度恢复 | `_playAudio` 开头清零，从不恢复 | `_pendingSeek` 机制：load 后一次性 seek，保持只加载不自动播 |
+| RepeatMode.Shuffle/ShuffleOff | next/prev switch 落空返回 undefined | Shuffle 按 On 环绕、ShuffleOff 按 Off 不环绕（9a① 的决策：列表已被物理洗牌） |
+| addToNextPlay 末首 | `splice(NaN,0,x)` 插到队首 | 追加到队尾（9a②） |
+| playTrack 找不到歌曲 | `_trackIndex=-1`，state 永久卡 Loading | 前置检查，toast 后直接 return，不打断当前播放 |
+| _fetchAudioSource 失败 | 无数据 → undefined，抛错 → null | 统一返回 null（9a③） |
+| Howler 错误回调 | 只注册 onend，加载失败无兜底 | onloaderror/onplayerror → 每曲目重试一次（重取 URL 应对过期）→ 连续失败计数（成功 load 清零）→ 达 min(列表长度,10) 上限后 pause + 提示，不再无限跳歌 |
+| _playTrack fetch 失败 | state 停留 Loading | 回到 Ready |
+| 无音源分支 | toast + 裸 nextTrack()（On 模式整列不可播会无限循环） | 走统一 `_handlePlaybackFailure` 入口（含竞态守卫：过期回调按 trackID 忽略） |
+
+**注意**：`_playAudioViaHowler` 里 Howl 的 `volume: 1` 是**正确**的——Howler 全局音量 × 实例音量相乘，音量经 setter 写入全局；实例若再设为用户音量会变成 v²。不要"修"它。
+
+### 测试与基线变化
+
+- web 测试：`4 文件 / 50 用例` → **`7 文件 / 86 用例`，全绿**。
+  - 新增 `playerState.test.ts`（19）、`player.restore.test.ts`（6）、`player.failure.test.ts`（11）。
+  - `player.queue.test.ts` 中 3 个"锁定错误行为"用例改为锁定目标行为，新增 1 个末首去重用例。
+- `pnpm --filter web test:types`：**0 error**（保持基线）。
+- lint：`player.ts` / `states/player.ts` 维持 HEAD 既存错误（10 + 2 个），本次改动**零新增**。
+- 既存 lint 错误按计划不在本批处理。
+
+### 浏览器冒烟（2026-11-27，17/17 通过）
+
+MCP 浏览器桥不可用，改用**零依赖方案**：headless Edge + Node 内置 WebSocket 直连 CDP（脚本在 `%TEMP%/smoke-player-restore.mjs`，可复用）。两个场景：
+
+1. **legacy（无 `__v`）数据恢复**：音量 0、进度 42、shuffle 队列与 originTrackList、repeatMode 全部恢复；不自动播放；`__v=1` 实例与持久化写回均生效。
+2. **损坏 JSON 启动**：应用正常启动、默认状态、无未捕获异常。
+
+**冒烟抓到并已修复的两个单测盲区**：
+
+| 问题 | 修复 |
+|---|---|
+| 损坏的 localStorage JSON 会让模块级 `JSON.parse` 抛异常**打爆启动**（既存缺陷） | `parsePersistedPlayerState()` 包裹解析，损坏返回 `{}`；`states/player.ts` 接入 |
+| 恢复加载（autoplay=false）失败后的失败推进走 `nextTrack()` 默认 autoplay=true，**启动时自动出声**；且静默加载完成后 state 卡 Loading | autoplay 意图贯穿 `nextTrack → _playTrack → _playAudio`（含 FM 分支）；load 回调中 `!autoplay && Loading → Ready` |
+
+冒烟注意事项：种子数据必须在**同源静态页面**（favicon.svg）上写入再导航进应用——直接在应用页写 localStorage 会被 `beforeunload` 的 persist flush 覆盖。
+
+### 9a 开放问题的最终决策
+
+1. **Shuffle 语义**：列表已被 `shufflePlayList()` 物理洗牌，队列推进把 Shuffle 当 On（环绕）、ShuffleOff 当 Off（不环绕）。IPC Repeat 通道设 Shuffle 后按下一首不再坏。
+2. **末首"下一首播放"**：追加队尾。
+3. **falsy 不一致**：统一 null。
+
+### 下一步候选（阶段 1 剩余 P0）
+
+- 移动队列打开入口（`PlayerMobile.tsx:78` 渲染条件写反）
+- 曲目激活规则统一（仅 `TrackList.tsx` 有移动端单击分支，其余 8 处硬编码双击）
+- 账号切换 / 登出的 React Query 缓存清理（`useUser.ts` logout 只 refetch 账号 query）
+- 301 未登录的 logout 接线（`request.ts:37` 被注释）
+- 无效设置清理（`unlock`、`keyboardShortcuts.localEnabled`）
