@@ -1,11 +1,13 @@
 import { Player } from '@/web/utils/player'
 import { proxy, subscribe } from 'valtio'
 import { isLyricsWindow } from '@/web/utils/isLyricsWindow'
+import { parsePersistedPlayerState } from '@/web/utils/playerState'
 
 const playerInLocalStorage = localStorage.getItem('player')
 const player = proxy(new Player())
 
-player.init((playerInLocalStorage && JSON.parse(playerInLocalStorage)) || {})
+// 损坏的持久化数据返回 {}（全新启动），不会让 JSON.parse 异常打爆启动
+player.init(parsePersistedPlayerState(playerInLocalStorage))
 
 // --- persistence ------------------------------------------------------------
 // `player` is a large object (trackList can hold 1000+ ids), and `_progress`

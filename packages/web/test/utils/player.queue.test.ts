@@ -1,13 +1,14 @@
 /**
  * player.ts 特征测试（characterization tests）
  *
- * 目的：锁住「当前」行为，而不是「应该」的行为。
- * 用途：任何针对 player.ts 的改动，跑这个文件就能知道有没有改变既有语义。
+ * 目的：锁住播放队列的既有语义，任何针对 player.ts 的改动跑这个文件
+ * 就能知道有没有改变既有行为。
  *
- * 注意：文件里有两处标注了「当前行为待确认」的用例，分别对应
- * docs/ai/backlog.md 第 9 条的三个开放问题。它们断言的是现状，
- * 不是设计意图 —— 如果将来有人改了实现，这些用例应该失败，然后由人决定
- * 是新行为更好，还是把旧行为改回来。
+ * 历史：文件里曾有三处「当前行为待确认」用例（backlog 第 9 条），
+ * 2026-11-26 播放器三件套修复后已改为锁定目标行为：
+ *  - Shuffle / ShuffleOff 在队列推进中的语义（按已洗牌列表处理）
+ *  - addToNextPlay 在最后一首时追加队尾（原来是 splice(NaN) 插队首）
+ *  - _fetchAudioSource 两条失败路径统一返回 null
  *
  * 本文件只测纯逻辑，不触碰网络、Howler 真实播放、localStorage。
  */
@@ -125,18 +126,22 @@ describe('队列推进：边界', () => {
     expect(prevIndexOf(p)).toBe(0)
   })
 
-  // ⚠️ 当前行为待确认（backlog 第 9 条）
-  // _nextTrackIndex / _prevTrackIndex 的 switch 只处理了 Off / On / One，
-  // Shuffle 与 ShuffleOff 落空 → 返回 undefined。
-  // 若 repeatMode 真被设成 Shuffle，nextTrack() 会走「没有下一首了 + 暂停」分支。
-  // 但 UI 的 shuffle 按钮只调 shufflePlayList()、不设 repeatMode，
-  // 所以实际运行时大概率不触发。两条路径不一致，需人工确认哪个是意图。
-  it('Shuffle / ShuffleOff 未被 switch 处理，返回 undefined（当前行为）', () => {
+  // 目标行为（2026-11-26 起生效，backlog 9a① 的决策）：
+  // shuffle 开启时列表已被 shufflePlayList() 物理洗牌，因此队列推进把
+  // Shuffle 当作 On（环绕）、ShuffleOff 当作 Off（不环绕）。
+  it('Shuffle 按 On 环绕推进，ShuffleOff 按 Off 不环绕推进', () => {
     const p = makePlayer([11, 22, 33], 1)
     p.repeatMode = RepeatMode.Shuffle
-    expect(nextIndexOf(p)).toBeUndefined()
+    expect(nextIndexOf(p)).toBe(2)
+    expect(prevIndexOf(p)).toBe(0)
+    // 末尾环绕
+    ;(p as unknown as { _trackIndex: number })._trackIndex = 2
+    expect(nextIndexOf(p)).toBe(0)
+
     p.repeatMode = RepeatMode.ShuffleOff
-    expect(prevIndexOf(p)).toBeUndefined()
+    expect(nextIndexOf(p)).toBeUndefined()
+    ;(p as unknown as { _trackIndex: number })._trackIndex = 1
+    expect(prevIndexOf(p)).toBe(0)
   })
 })
 
@@ -219,13 +224,10 @@ describe('_fetchAudioSource 的取值与净化', () => {
     })
   })
 
-  it('接口没有返回 url 时 audio 为 undefined（注意：与抛错分支的 null 不是同一个值）', async () => {
+  it('无 url 与抛错两条失败路径统一返回 audio: null（2026-11-26 起生效）', async () => {
     mocks.fetchAudioSource.mockResolvedValue({ data: [] })
     const p = makePlayer([1], 0)
-    // 两条失败路径的返回值不一致：无数据 → undefined，抛错 → null。
-    // 调用方统一用 `if (!audio)` 判断，所以目前无影响；
-    // 但任何改成 `audio === null` 的判断都会漏掉前者。
-    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: undefined, id: 1 })
+    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: null, id: 1 })
   })
 
   it('接口抛错被吞掉，返回 audio: null —— 这是既有行为，不要在重构中改成向上抛', async () => {
@@ -250,16 +252,20 @@ describe('队列编辑', () => {
     expect(p.trackList).toEqual([11, 33, 22])
   })
 
-  // ⚠️ 当前行为待确认（backlog 第 9 条）
-  // 在「最后一首」时 _nextTrackIndex 为 undefined，代码里是
-  // this.trackList.splice(Number(this._nextTrackIndex), 0, trackID)
-  // Number(undefined) === NaN，而 splice(NaN, 0, x) 等价于插到队首。
-  // 期望行为大概是「追加到末尾」，但现状是插到最前面。
-  it('addToNextPlay 在最后一首时被插到队首（Number(undefined) → NaN → splice 0，当前行为）', () => {
+  // 目标行为（2026-11-26 起生效，backlog 9a②）：末首时 _nextTrackIndex 为
+  // undefined，应追加到队尾；原实现 splice(NaN,0,x) 会插到队首。
+  it('addToNextPlay 在最后一首时追加到队尾', () => {
     const p = makePlayer([11, 22, 33], 2)
     p.repeatMode = RepeatMode.Off
     p.addToNextPlay(99)
-    expect(p.trackList).toEqual([99, 11, 22, 33])
+    expect(p.trackList).toEqual([11, 22, 33, 99])
+  })
+
+  it('addToNextPlay 末首 + 已存在歌曲：去重后追加到队尾', () => {
+    const p = makePlayer([11, 22, 33], 2)
+    p.repeatMode = RepeatMode.Off
+    p.addToNextPlay(11)
+    expect(p.trackList).toEqual([22, 33, 11])
   })
 
   it('addToFirstPlay 已存在时去重并置顶', () => {

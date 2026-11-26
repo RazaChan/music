@@ -17,6 +17,7 @@ import { scrobble } from '@/web/api/user'
 import { fetchArtistWithReactQuery } from '../api/hooks/useArtist'
 import { appName } from './const'
 import { isLyricsWindow } from './isLyricsWindow'
+import { PLAYER_STATE_VERSION, sanitizePlayerState } from './playerState'
 
 type TrackID = number
 export enum TrackListSourceType {
@@ -60,6 +61,18 @@ export class Player {
   fmTrackList: TrackID[] = []
   shuffle: boolean = false
   fmTrack: Track | null = null
+  /** 持久化数据版本标记，随 JSON.stringify(player) 一起写入 localStorage */
+  __v: number = PLAYER_STATE_VERSION
+
+  /**
+   * 恢复播放时的待应用进度（秒）。init() 设置后，由 _playAudioViaHowler 的
+   * load 回调一次性消费；任何显式切歌（_setStateToLoading）都会取消它。
+   */
+  private _pendingSeek: number | null = null
+  /** 连续播放失败计数，成功 load 时清零 */
+  private _consecutiveFailures: number = 0
+  /** 本曲目是否已做过一次「重新取 URL」重试（CDN 链接会过期） */
+  private _retriedTrackID: TrackID | null = null
 
   /**
    * Persistence hook, set by the store (states/player.ts). Invoked after a
@@ -70,20 +83,23 @@ export class Player {
   _onUserSeek: (() => void) | null = null
 
   init(params: { [key: string]: any }) {
-    if (params._track) this._track = params._track
-    if (params._trackIndex) this._trackIndex = params._trackIndex
-    if (params._volume) this._volume = params._volume
-    if (params._repeatMode) this._repeatMode = params._repeatMode
-    if (params.state) this.trackList = params.state
-    if (params.mode) this.mode = params.mode
-    if (params.trackList) this.trackList = params.trackList
-    if (params.trackListSource) this.trackListSource = params.trackListSource
-    if (params.fmTrackList) this.fmTrackList = params.fmTrackList
-    if (params.shuffle) {
-      this.shuffle = params.shuffle
-      this.shufflePlayList()
-    }
-    if (params.fmTrack) this.fmTrack = params.fmTrack
+    // 逐字段校验恢复：非法字段单独丢弃（见 utils/playerState.ts），
+    // 音量 0、进度、原始队列都在这里恢复。
+    const restored = sanitizePlayerState(params)
+    if (restored._track !== undefined) this._track = restored._track
+    if (restored._trackIndex !== undefined) this._trackIndex = restored._trackIndex
+    // 经 setter 恢复，同步 Howler 全局音量；音量为 0（静音）也能恢复
+    if (restored._volume !== undefined) this.volume = restored._volume
+    if (restored._repeatMode !== undefined) this._repeatMode = restored._repeatMode
+    if (restored.mode !== undefined) this.mode = restored.mode
+    if (restored.trackList !== undefined) this.trackList = restored.trackList
+    // 已洗好的队列顺序直接还原（含 originTrackList 供取消随机时恢复），
+    // 不再调 shufflePlayList() 重洗 —— 那会把队列清空或改变顺序
+    if (restored.originTrackList !== undefined) this.originTrackList = restored.originTrackList
+    if (restored.trackListSource !== undefined) this.trackListSource = restored.trackListSource
+    if (restored.fmTrackList !== undefined) this.fmTrackList = restored.fmTrackList
+    if (restored.shuffle !== undefined) this.shuffle = restored.shuffle
+    if (restored.fmTrack !== undefined) this.fmTrack = restored.fmTrack
 
     this.state = State.Ready
     // The desktop-lyrics window is a read-only consumer of player state
@@ -91,6 +107,11 @@ export class Player {
     // muted Howl with html5 preload=auto that downloads the full track, and
     // _initFM would fire network calls — all for a window that never plays.
     if (!isLyricsWindow) {
+      // 恢复上次进度：pendingSeek 在音频 load 后应用，播放仍保持暂停
+      if (restored._progress !== undefined && this.trackID) {
+        this._progress = restored._progress
+        this._pendingSeek = restored._progress
+      }
       if (this.trackID) this._playAudio(false) // just load the audio, not play
       this._initFM()
     }
@@ -110,12 +131,18 @@ export class Player {
     switch (this.repeatMode) {
       case RepeatMode.One:
         return this._trackIndex
+      // shuffle 开启时列表已被 shufflePlayList() 物理洗牌，
+      // ShuffleOff 与 Off 一样不环绕，Shuffle 与 On 一样环绕
       case RepeatMode.Off:
+      case RepeatMode.ShuffleOff:
         if (this._trackIndex === 0) return 0
         return this._trackIndex - 1
       case RepeatMode.On:
+      case RepeatMode.Shuffle:
         if (this._trackIndex - 1 < 0) return this.trackList.length - 1
         return this._trackIndex - 1
+      default:
+        return undefined
     }
   }
 
@@ -127,11 +154,15 @@ export class Player {
       case RepeatMode.One:
         return this._trackIndex
       case RepeatMode.Off:
+      case RepeatMode.ShuffleOff:
         if (this._trackIndex + 1 >= this.trackList.length) return
         return this._trackIndex + 1
       case RepeatMode.On:
+      case RepeatMode.Shuffle:
         if (this._trackIndex + 1 >= this.trackList.length) return 0
         return this._trackIndex + 1
+      default:
+        return undefined
     }
   }
 
@@ -234,6 +265,8 @@ export class Player {
   private _setStateToLoading() {
     this._scrobble()
     this.state = State.Loading
+    // 显式切歌取消恢复期的 pendingSeek（init 的恢复路径不经过这里）
+    this._pendingSeek = null
     _howler.pause()
   }
 
@@ -299,7 +332,7 @@ export class Player {
       // console.log(`[player] fetchAudioSourceWithReactQuery `, trackID)
       const response = await fetchAudioSourceWithReactQuery({ id: trackID })
       // console.log(`[player] fetchAudioSourceWithReactQuery `, response)
-      let audio = response.data?.[0]?.url
+      let audio = response.data?.[0]?.url ?? null
       if (audio && audio.includes('126.net')) {
         audio = audio.replace('http://', 'https://')
       }
@@ -308,6 +341,7 @@ export class Player {
         id: trackID,
       }
     } catch {
+      // 与「无数据」分支统一返回 null，调用方只需判断 !audio
       return {
         audio: null,
         id: trackID,
@@ -317,36 +351,72 @@ export class Player {
 
   /**
    * Play a track based on this.trackID
+   * @param autoplay 透传给 _playAudio —— 恢复路径（false）的失败推进不得自动出声
    */
-  private async _playTrack() {
+  private async _playTrack(autoplay: boolean = true) {
     const id = this.trackID
     if (!id) return
     this.state = State.Loading
     const track = await this._fetchTrack(id)
     if (!track) {
       toast('加载歌曲信息失败')
+      // 不能停留在 Loading —— 那会让 UI 永久卡在加载态
+      this.state = State.Ready
       return
     }
     if (this.mode === Mode.TrackList) this._track = track
     if (this.mode === Mode.FM) this.fmTrack = track
     this._updateMediaSessionMetaData()
-    this._playAudio()
+    this._playAudio(autoplay)
   }
 
   /**
    * Play audio via howler
    */
   private async _playAudio(autoplay: boolean = true) {
-    this._progress = 0
+    // 恢复期的 pendingSeek 拥有进度值，不能清零（见 init）
+    if (this._pendingSeek === null) this._progress = 0
     const { audio, id } = await this._fetchAudioSource(this.trackID)
 
+    // 过期响应：用户已经切到别的歌了
+    if (this.trackID !== id) return
     if (!audio) {
-      toast('无法播放此歌曲')
-      this.nextTrack()
+      this._handlePlaybackFailure(id, autoplay)
       return
     }
-    if (this.trackID !== id) return
     this._playAudioViaHowler(audio, id, autoplay)
+  }
+
+  /**
+   * 统一的播放失败处理（无可用 URL / Howler load 错误 / play 错误）。
+   *
+   * 策略：每首曲目先重试一次（重新取 URL —— CDN 链接会过期），仍失败则
+   * 计入连续失败并跳下一首；连续失败达到 min(列表长度, 10) 说明整列大概率
+   * 不可播（断网、VIP 限定等），暂停并提示，而不是无限跳歌。
+   */
+  private _handlePlaybackFailure(id: TrackID, autoplay: boolean) {
+    // 过期回调：错误回来时已经切到别的歌了
+    if (this.trackID !== id) return
+
+    if (this._retriedTrackID !== id) {
+      this._retriedTrackID = id
+      this._playAudio(autoplay)
+      return
+    }
+
+    this._consecutiveFailures += 1
+    const listLength = this.mode === Mode.FM ? this.fmTrackList.length : this.trackList.length
+    const cap = Math.min(Math.max(listLength, 1), 10)
+    if (this._consecutiveFailures >= cap) {
+      this._consecutiveFailures = 0
+      this._retriedTrackID = null
+      toast('多首歌曲无法播放，已停止播放')
+      this.pause()
+      return
+    }
+    toast('无法播放此歌曲')
+    // 推进时保留原始 autoplay 意图：恢复路径（false）的失败推进不得自动出声
+    this.nextTrack(false, autoplay)
   }
 
   private async _playAudioViaHowler(audio: string, id: number, autoplay: boolean = true) {
@@ -361,6 +431,12 @@ export class Player {
       volume: 1,
       onend: () => {
         this._howlerOnEndCallback()
+      },
+      onloaderror: () => {
+        this._handlePlaybackFailure(id, autoplay)
+      },
+      onplayerror: () => {
+        this._handlePlaybackFailure(id, autoplay)
       },
     })
     _howler = howler
@@ -389,6 +465,23 @@ export class Player {
       this.state = State.Playing
     }
     _howler.once('load', () => {
+      // 恢复期的进度在这里一次性应用（init 设置的 pendingSeek）
+      if (this._pendingSeek !== null) {
+        const resumeAt = this._pendingSeek
+        this._pendingSeek = null
+        this._progress = resumeAt
+        try {
+          _howler.seek(resumeAt)
+        } catch {
+          /* ignore */
+        }
+      }
+      // 静默加载（恢复 / 失败推进且 autoplay=false）完成后回到 Ready，
+      // 不能卡在 Loading
+      if (!autoplay && this.state === State.Loading) this.state = State.Ready
+      // 成功加载即视为播放链路恢复，清零失败计数
+      this._consecutiveFailures = 0
+      this._retriedTrackID = null
       this._cacheAudio((_howler as any)._src)
     })
 
@@ -417,7 +510,7 @@ export class Player {
     cacheAudio(id, audio, response?.data?.[0]?.br)
   }
 
-  private async _nextFMTrack() {
+  private async _nextFMTrack(autoplay: boolean = true) {
     const prefetchNextTrack = async () => {
       const prefetchTrackID = this.fmTrackList[1]
       const track = await this._fetchTrack(prefetchTrackID)
@@ -429,7 +522,7 @@ export class Player {
 
     this.fmTrackList.shift()
     if (this.fmTrackList.length === 0) await this._loadMoreFMTracks()
-    this._playTrack()
+    this._playTrack(autoplay)
 
     this.fmTrackList.length <= 1 ? await this._loadMoreFMTracks() : this._loadMoreFMTracks()
     prefetchNextTrack()
@@ -508,13 +601,15 @@ export class Player {
 
   /**
    * Play next track
+   * @param forceFM 强制走 FM 队列
+   * @param autoplay 失败推进时透传的播放意图（恢复路径为 false，不自动出声）
    */
-  nextTrack(forceFM: boolean = false) {
+  nextTrack(forceFM: boolean = false, autoplay: boolean = true) {
     this._setStateToLoading()
     this._progress = 0
     if (forceFM || this.mode === Mode.FM) {
       this.mode = Mode.FM
-      this._nextFMTrack()
+      this._nextFMTrack(autoplay)
       return
     }
     if (this._nextTrackIndex === undefined) {
@@ -524,7 +619,7 @@ export class Player {
     }
     this._trackIndex = this._nextTrackIndex
 
-    this._playTrack()
+    this._playTrack(autoplay)
   }
 
   /**
@@ -563,10 +658,11 @@ export class Player {
     // 判重
     if (this.trackList.includes(trackID)) {
       this.trackList = this.trackList.filter(item => item != trackID)
-      this.trackList.splice(Number(this._nextTrackIndex), 0, trackID)
-      return
     }
-    this.trackList.splice(Number(this._nextTrackIndex), 0, trackID)
+    // 末首（不环绕）时 _nextTrackIndex 为 undefined —— 追加到队尾，
+    // 而不是 splice(NaN, 0, x) 插到队首
+    const index = this._nextTrackIndex ?? this.trackList.length
+    this.trackList.splice(index, 0, trackID)
   }
 
   /**
@@ -722,9 +818,14 @@ export class Player {
    * Play track in trackList by id
    */
   async playTrack(trackID: TrackID) {
-    this._setStateToLoading()
     const index = this.trackList.findIndex(t => t === trackID)
-    if (index === -1) toast('播放失败，歌曲不在列表内')
+    if (index === -1) {
+      // 找不到就不动任何播放状态 —— 原实现会继续把 _trackIndex 设为 -1，
+      // 最终 state 永久卡在 Loading
+      toast('播放失败，歌曲不在列表内')
+      return
+    }
+    this._setStateToLoading()
     this._trackIndex = index
     this._playTrack()
   }
