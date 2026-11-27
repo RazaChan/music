@@ -31,7 +31,8 @@
     "empty": "这里空空如也",
     "error": "加载失败",
     "retry": "重试",
-    "please-login-hint": "登录后查看你的音乐"
+    "please-login-hint": "登录后查看你的音乐",
+    "alternative-source": "替代音源"
   },
   "navigation": {
     "goBack": "返回",
@@ -154,7 +155,14 @@
     "audio-cache": "音频缓存",
     "api-cache": "API 缓存",
     "clear-cache": "清除",
-    "cache-cleared": "缓存已清除"
+    "cache-cleared": "缓存已清除",
+    "title-audio-quality": "音质",
+    "audio-quality": "播放音质",
+    "audio-quality-description": "请求的音源档位。无对应权益时上游会自动降级，实际档位显示在播放器曲目卡片上。",
+    "quality-standard": "标准 128K",
+    "quality-exhigh": "极高 320K",
+    "quality-lossless": "无损",
+    "quality-hires": "Hi-Res"
   },
   "context-menu": {
     "share": "分享",

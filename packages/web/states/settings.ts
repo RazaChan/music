@@ -26,6 +26,8 @@ interface Settings {
   displayPlaylistsFromNeteaseMusic: boolean
   closeWindowInMinimize: boolean
   showBackgroundImage: boolean
+  /** 请求的音源音质档位；上游会按账号权益自动降级，实际档位以响应为准 */
+  audioQuality: 'standard' | 'higher' | 'exhigh' | 'lossless' | 'hires'
   theme: string
   showDesktopLyrics: boolean
   keyboardShortcuts: KeyboardShortcutSettings
@@ -67,6 +69,7 @@ const initSettings: Settings = {
     port: 0,
     protocol: 'http',
   },
+  audioQuality: 'exhigh',
   theme: 'dark',
   showDesktopLyrics: false,
   keyboardShortcuts: getKeyboardShortcutDefaultSettings(),

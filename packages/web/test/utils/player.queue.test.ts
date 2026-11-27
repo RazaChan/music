@@ -46,6 +46,10 @@ vi.mock('@/web/api/r3play', () => ({ cacheAudio: vi.fn() }))
 vi.mock('@/web/api/user', () => ({ scrobble: vi.fn() }))
 vi.mock('react-hot-toast', () => ({ default: mocks.toast }))
 vi.mock('@/web/utils/isLyricsWindow', () => ({ isLyricsWindow: false }))
+// player.ts 依赖 settings（audioQuality / 源站 cookie），测试里固定为可控对象
+vi.mock('@/web/states/settings', () => ({
+  default: { audioQuality: 'exhigh', qqCookie: '', miguCookie: '', jooxCookie: '' },
+}))
 
 import { Mode, Player, State } from '@/web/utils/player'
 import { RepeatMode } from '@/shared/playerDataTypes'
@@ -203,7 +207,7 @@ describe('progress 与 volume', () => {
 
 describe('_fetchAudioSource 的取值与净化', () => {
   const fetchSource = (p: Player, id: number) =>
-    (p as unknown as { _fetchAudioSource: (id: number) => Promise<{ audio: string | null; id: number }> })
+    (p as unknown as { _fetchAudioSource: (id: number) => Promise<{ audio: string | null; id: number; quality: { level: string | null; br: number | null; source: string | null } | null }> })
       ._fetchAudioSource(id)
 
   it('126.net 的 http 地址被强升为 https', async () => {
@@ -212,6 +216,8 @@ describe('_fetchAudioSource 的取值与净化', () => {
     await expect(fetchSource(p, 1)).resolves.toEqual({
       audio: 'https://m8.music.126.net/a.mp3',
       id: 1,
+      // data[0] 存在但 mock 无 level/br/source 字段 → 各字段为 null
+      quality: { level: null, br: null, source: null },
     })
   })
 
@@ -221,19 +227,20 @@ describe('_fetchAudioSource 的取值与净化', () => {
     await expect(fetchSource(p, 1)).resolves.toEqual({
       audio: 'http://example.com/a.mp3',
       id: 1,
+      quality: { level: null, br: null, source: null },
     })
   })
 
   it('无 url 与抛错两条失败路径统一返回 audio: null（2026-11-26 起生效）', async () => {
     mocks.fetchAudioSource.mockResolvedValue({ data: [] })
     const p = makePlayer([1], 0)
-    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: null, id: 1 })
+    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: null, id: 1, quality: null })
   })
 
   it('接口抛错被吞掉，返回 audio: null —— 这是既有行为，不要在重构中改成向上抛', async () => {
     mocks.fetchAudioSource.mockRejectedValue(new Error('network'))
     const p = makePlayer([1], 0)
-    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: null, id: 1 })
+    await expect(fetchSource(p, 1)).resolves.toEqual({ audio: null, id: 1, quality: null })
   })
 })
 

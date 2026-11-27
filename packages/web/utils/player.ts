@@ -18,6 +18,7 @@ import { fetchArtistWithReactQuery } from '../api/hooks/useArtist'
 import { appName } from './const'
 import { isLyricsWindow } from './isLyricsWindow'
 import { PLAYER_STATE_VERSION, sanitizePlayerState } from './playerState'
+import settings from '@/web/states/settings'
 
 type TrackID = number
 export enum TrackListSourceType {
@@ -61,6 +62,8 @@ export class Player {
   fmTrackList: TrackID[] = []
   shuffle: boolean = false
   fmTrack: Track | null = null
+  /** 当前曲目音源的实际音质信息（level 为上游/缓存回报的真实档位，可能因权益降级） */
+  audioQuality: { level: string | null; br: number | null; source: string | null } | null = null
   /** 持久化数据版本标记，随 JSON.stringify(player) 一起写入 localStorage */
   __v: number = PLAYER_STATE_VERSION
 
@@ -267,6 +270,8 @@ export class Player {
     this.state = State.Loading
     // 显式切歌取消恢复期的 pendingSeek（init 的恢复路径不经过这里）
     this._pendingSeek = null
+    // 旧曲目的音质信息不再代表当前加载中的曲目
+    this.audioQuality = null
     _howler.pause()
   }
 
@@ -329,22 +334,34 @@ export class Player {
    */
   private async _fetchAudioSource(trackID: TrackID) {
     try {
-      // console.log(`[player] fetchAudioSourceWithReactQuery `, trackID)
-      const response = await fetchAudioSourceWithReactQuery({ id: trackID })
-      // console.log(`[player] fetchAudioSourceWithReactQuery `, response)
+      // 按用户设置的音质档位请求；queryKey 含 params（含 level），切档位不会命中旧缓存
+      const response = await fetchAudioSourceWithReactQuery({
+        id: trackID,
+        level: settings.audioQuality,
+      })
       let audio = response.data?.[0]?.url ?? null
       if (audio && audio.includes('126.net')) {
         audio = audio.replace('http://', 'https://')
       }
+      const info = response.data?.[0]
       return {
         audio,
         id: trackID,
+        // 实际音质信息（上游按权益自动降级后的真实档位；缓存命中时为缓存档位）
+        quality: info
+          ? {
+              level: info.level ?? null,
+              br: info.br ?? null,
+              source: info.source ?? null,
+            }
+          : null,
       }
     } catch {
       // 与「无数据」分支统一返回 null，调用方只需判断 !audio
       return {
         audio: null,
         id: trackID,
+        quality: null,
       }
     }
   }
@@ -376,7 +393,7 @@ export class Player {
   private async _playAudio(autoplay: boolean = true) {
     // 恢复期的 pendingSeek 拥有进度值，不能清零（见 init）
     if (this._pendingSeek === null) this._progress = 0
-    const { audio, id } = await this._fetchAudioSource(this.trackID)
+    const { audio, id, quality } = await this._fetchAudioSource(this.trackID)
 
     // 过期响应：用户已经切到别的歌了
     if (this.trackID !== id) return
@@ -384,6 +401,7 @@ export class Player {
       this._handlePlaybackFailure(id, autoplay)
       return
     }
+    this.audioQuality = quality
     this._playAudioViaHowler(audio, id, autoplay)
   }
 
@@ -504,8 +522,8 @@ export class Player {
     if (audio.includes(appName.toLowerCase()) || !window.ipcRenderer) return
     const id = Number(new URL(audio).searchParams.get('dash-id'))
     if (isNaN(id) || !id) return
-    // audio info
-    const response = await fetchAudioSourceWithReactQuery({ id })
+    // audio info —— 用与播放相同的音质档位请求，响应里的 br/level 才是这份文件的真实值
+    const response = await fetchAudioSourceWithReactQuery({ id, level: settings.audioQuality })
     // 缓存按 (id, level) 键控 —— 用接口回报的实际档位（缓存命中时也是真实值）
     const level = response?.data?.[0]?.level
     // 缓存
@@ -581,6 +599,22 @@ export class Player {
    */
   playOrPause(fade: boolean = true) {
     this.state === State.Playing ? this.pause(fade) : this.play(fade)
+  }
+
+  /**
+   * 音质设置变更后重载当前曲目的音源：保持播放/暂停状态与播放进度。
+   * 复用 pendingSeek 机制（音频 load 后一次性 seek 回原进度）。
+   */
+  async reloadAudioSource() {
+    if (!this.trackID) return
+    const progress = this.liveCurrentTime()
+    const wasPlaying = this.state === State.Playing
+    this._setStateToLoading()
+    if (progress > 0) {
+      this._progress = progress
+      this._pendingSeek = progress
+    }
+    await this._playAudio(wasPlaying)
   }
 
   /**

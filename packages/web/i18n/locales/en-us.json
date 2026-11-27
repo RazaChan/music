@@ -31,7 +31,8 @@
     "empty": "Nothing here yet",
     "error": "Failed to load",
     "retry": "Retry",
-    "please-login-hint": "Log in to see your music"
+    "please-login-hint": "Log in to see your music",
+    "alternative-source": "Alternative source"
   },
   "navigation": {
     "goBack": "Go back",
@@ -154,7 +155,14 @@
     "audio-cache": "Audio cache",
     "api-cache": "API cache",
     "clear-cache": "Clear",
-    "cache-cleared": "Cache cleared"
+    "cache-cleared": "Cache cleared",
+    "title-audio-quality": "Audio Quality",
+    "audio-quality": "Playback quality",
+    "audio-quality-description": "Requested source quality. The upstream automatically falls back based on your account entitlement; the actual quality is shown on the player card.",
+    "quality-standard": "Standard 128K",
+    "quality-exhigh": "Extreme 320K",
+    "quality-lossless": "Lossless",
+    "quality-hires": "Hi-Res"
   },
   "context-menu": {
     "share": "Share",

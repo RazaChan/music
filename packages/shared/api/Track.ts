@@ -53,7 +53,8 @@ export interface FetchAudioSourceResponse {
     freeTrialInfo: null
     gain: number
     id: number
-    level: 'standard' | 'null'
+    /** 实际提供的音质档位（上游按权益自动降级后的结果；缓存命中时为缓存档位） */
+    level: string
     md5: string | null
     payed: number
     size: number
@@ -61,6 +62,8 @@ export interface FetchAudioSourceResponse {
     uf: null
     url: string | null
     urlSource: number
+    /** 替代音源来源（unblock / 本地缓存命中时存在） */
+    source?: string
   }[]
 }
 

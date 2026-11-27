@@ -1,15 +1,58 @@
 import settings from '@/web/states/settings'
+import player from '@/web/states/player'
 import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
-import { BlockDescription, BlockTitle, Button, Option, OptionText, Switch } from './Controls'
+import { BlockDescription, BlockTitle, Button, Option, OptionText, Select, Switch } from './Controls'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
+
+type AudioQualityLevel = 'standard' | 'exhigh' | 'lossless' | 'hires'
 
 function Player() {
   return (
     <div className='iterms-center flex w-full justify-between'>
-      <FindTrackOnYouTube />
+      <div className='flex w-full flex-col justify-between'>
+        <AudioQuality />
+        <FindTrackOnYouTube />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 音质选择。上游会按账号权益自动降级（要无损但无权益时给实际可用档位），
+ * 实际播放档位展示在桌面播放器的曲目信息卡上。
+ */
+function AudioQuality() {
+  const { t } = useTranslation()
+  const { audioQuality } = useSnapshot(settings)
+
+  const options: { name: string; value: AudioQualityLevel }[] = [
+    { name: t`settings.quality-standard`, value: 'standard' },
+    { name: t`settings.quality-exhigh`, value: 'exhigh' },
+    { name: t`settings.quality-lossless`, value: 'lossless' },
+    { name: t`settings.quality-hires`, value: 'hires' },
+  ]
+
+  return (
+    <div className='mb-8'>
+      <BlockTitle>{t`settings.title-audio-quality`}</BlockTitle>
+      <BlockDescription>{t`settings.audio-quality-description`}</BlockDescription>
+      <Option>
+        <OptionText>{t`settings.audio-quality`}</OptionText>
+        <div data-testid='settings-audio-quality'>
+          <Select
+            options={options}
+            value={(audioQuality === 'higher' ? 'exhigh' : audioQuality) as AudioQualityLevel}
+            onChange={value => {
+              settings.audioQuality = value
+              // 正在播放时立即按新档位重载当前曲目（保持进度与播放状态）
+              player.reloadAudioSource()
+            }}
+          />
+        </div>
+      </Option>
     </div>
   )
 }

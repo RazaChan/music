@@ -385,3 +385,27 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 - dev 环境 vite 代理路径是 `/r3playx/`（appName 小写），桌面 appServer 在 dev 下由 30001 承载——curl 验证时别打成 `/r3play/`
 - 双实现新漂移点已消除：桌面回退兜底、元数据容错；仍为平台差异的：源列表 / cookie 来源 / YouTube 链（见 §12 前的对照表，桌面优先决策下保留）
 - server 端无测试基建，audioRange/audioSchema 为 desktop 测试覆盖的同构副本，改动需两端同步
+
+## 14. 阶段 2 第二批落地记录（2026-11-27）—— 音质选择与真实音质展示
+
+### 交付内容
+
+**音质设置**：`settings.audioQuality`（默认 `exhigh` 保持既有行为），Settings → Player 新增选择器（标准 128K / 极高 320K / 无损 / Hi-Res；不含上游不认识的 `higher`）。切换时调 `player.reloadAudioSource()` **立即生效**：重新按新档位取流，经 pendingSeek 机制恢复进度，保持播放/暂停状态。
+
+**level 全链路**：`player._fetchAudioSource` 按 `settings.audioQuality` 请求（React Query 的 queryKey 含 params 整体，切档位不会命中旧响应缓存）；`_cacheAudio` 的二次取流带相同档位，保证入库的 br/level 是该文件的真实值（批 1 的 `(id, level)` 缓存键从此真正分档）。
+
+**真实音质展示**：`_fetchAudioSource` 返回新增 `quality: { level, br, source }`（上游按权益自动降级后的真实档位；缓存命中时为缓存档位；替代源无 level）；成功取流后落到 `player.audioQuality`，切歌时清空。桌面播放器曲目卡（NowPlaying/Info）新增音质徽标：`320K · 320kbps` 样式，无 level 时显示"替代音源"。
+
+**权益回退策略**：依赖上游天然行为（请求无损但无权益时返回实际可用档位），产品侧如实展示实际档位而非请求档位——这正是徽标的价值。网络状况自动降级不做（过度工程）。
+
+### 验证
+
+- 单测 **11 文件 / 102 用例**全绿：新增 `player.quality.test.ts` 6 用例（档位传递、权益降级如实记录、切歌清空、播放中重载保持进度与状态、暂停中重载不自动播、无曲目不做事）；`_fetchAudioSource` 既有断言补 quality 字段
+- `test:types` 0 error；lint 零新增
+- CDP 冒烟 **27/27**：新增场景 5——设置页选择器渲染、默认 exhigh、切换 lossless 持久化到 localStorage（分类名随语言变化，选择器需兼容 zh/en）
+- 三个 player 测试文件补 settings mock（player.ts 新增 settings 依赖）
+
+### 注意
+
+- 缓存命中响应的 `source` 字段（netease/youtube/unknown）目前只进 player.audioQuality，徽标暂不展示来源——留待后续按需展示
+- 移动端播放器无音质徽标（空间受限，桌面优先）

@@ -62,6 +62,10 @@ vi.mock('@/web/api/r3play', () => ({ cacheAudio: vi.fn() }))
 vi.mock('@/web/api/user', () => ({ scrobble: vi.fn() }))
 vi.mock('react-hot-toast', () => ({ default: mocks.toast }))
 vi.mock('@/web/utils/isLyricsWindow', () => ({ isLyricsWindow: false }))
+// player.ts 依赖 settings（audioQuality / 源站 cookie），测试里固定为可控对象
+vi.mock('@/web/states/settings', () => ({
+  default: { audioQuality: 'exhigh', qqCookie: '', miguCookie: '', jooxCookie: '' },
+}))
 
 import { Player, State } from '@/web/utils/player'
 
