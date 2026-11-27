@@ -91,7 +91,9 @@
     "double-click-to-play": "Double-click to play",
     "no-results": "No results found",
     "error": "Something went wrong, please retry",
-    "retry": "Retry"
+    "retry": "Retry",
+    "history": "Recent searches",
+    "clear-history": "Clear"
   },
   "my": {
     "xxxs-liked-tracks": "{{nickname}}'s Liked Tracks",

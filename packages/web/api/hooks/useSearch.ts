@@ -59,11 +59,11 @@ export function useSearchHot(enabled = true) {
 }
 
 // 搜索多重匹配 (best match)
-export function useSearchBestMatch(keywords: string) {
+export function useSearchBestMatch(keywords: string, enabled = true) {
   return useQuery<MultiMatchSearchResponse>({
     queryKey: [SearchApiNames.MultiMatchSearch, keywords],
     queryFn: ({ signal }) => multiMatchSearch({ keywords }, { signal }).then(ensureOk),
-    enabled: hasKeywords(keywords),
+    enabled: enabled && hasKeywords(keywords),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 1,
@@ -80,7 +80,8 @@ export function useSearchBestMatch(keywords: string) {
 export function useSearchResults(
   keywords: string,
   type: keyof typeof SearchTypes,
-  limit = 30
+  limit = 30,
+  enabled = true
 ) {
   return useQuery<CloudSearchResponse>({
     queryKey: [SearchApiNames.CloudSearch, keywords, type, limit],
@@ -88,7 +89,7 @@ export function useSearchResults(
       cloudSearch({ keywords, limit, offset: 0, type }, { signal }).then(
         ensureOk
       ),
-    enabled: hasKeywords(keywords),
+    enabled: enabled && hasKeywords(keywords),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 1,
@@ -100,7 +101,7 @@ export function useSearchResults(
 const SEARCH_PAGE_SIZE = 30
 
 // 云搜索 - 单曲 (infinite)
-export function useSearchTracksInfinite(keywords: string) {
+export function useSearchTracksInfinite(keywords: string, enabled = true) {
   return useInfiniteQuery({
     queryKey: [SearchApiNames.CloudSearch, keywords, 'Single', 'infinite'],
     queryFn: ({ pageParam = 0, signal }) =>
@@ -113,7 +114,7 @@ export function useSearchTracksInfinite(keywords: string) {
         },
         { signal }
       ).then(ensureOk),
-    enabled: hasKeywords(keywords),
+    enabled: enabled && hasKeywords(keywords),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 1,

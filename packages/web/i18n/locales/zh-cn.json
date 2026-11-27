@@ -91,7 +91,9 @@
     "double-click-to-play": "双击播放",
     "no-results": "没有找到相关结果",
     "error": "加载失败，请重试",
-    "retry": "重试"
+    "retry": "重试",
+    "history": "搜索历史",
+    "clear-history": "清空"
   },
   "my": {
     "xxxs-liked-tracks": "{{nickname}}喜欢的音乐",

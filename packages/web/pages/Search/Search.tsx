@@ -182,11 +182,16 @@ const Search = () => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<SearchTab>('all')
 
-  const bestMatchQuery = useSearchBestMatch(keywords)
-  const tracksQuery = useSearchTracksInfinite(keywords)
-  const artistQuery = useSearchResults(keywords, 'Artist', 30)
-  const albumQuery = useSearchResults(keywords, 'Album', 30)
-  const playlistQuery = useSearchResults(keywords, 'Playlist', 50)
+  // 按 Tab 懒加载：All 页展示各组预览需要全部查询；分类页只发本类请求，
+  // 避免进页就是 5 个并发（切 Tab 时 React Query 缓存直接复用）
+  const bestMatchQuery = useSearchBestMatch(keywords, activeTab === 'all')
+  const tracksQuery = useSearchTracksInfinite(
+    keywords,
+    activeTab === 'all' || activeTab === 'tracks'
+  )
+  const artistQuery = useSearchResults(keywords, 'Artist', 30, activeTab === 'all' || activeTab === 'artists')
+  const albumQuery = useSearchResults(keywords, 'Album', 30, activeTab === 'all' || activeTab === 'albums')
+  const playlistQuery = useSearchResults(keywords, 'Playlist', 50, activeTab === 'all' || activeTab === 'playlists')
 
   const queries = [bestMatchQuery, tracksQuery, artistQuery, albumQuery, playlistQuery]
   const isFetching = queries.some(q => q.isFetching)

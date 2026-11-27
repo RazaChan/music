@@ -534,3 +534,25 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 3. **hash 导航的文档上下文里合成 keydown 投递退化** → 键盘类断言用独立整页加载的文档
 
  Escape/焦点类功能本身经 4 种隔离路径验证正常，非应用 bug。
+
+## 20. 阶段 4 第一批落地记录（2026-11-27）—— 搜索升级
+
+### 交付内容
+
+**搜索建议接入**（`useSearchSuggestions` 此前已实现但零消费）：SearchModal 输入防抖 300ms 后请求建议，按上游 order 分组扁平化（歌曲 3 / 艺人 2 / 专辑 2 / 歌单 2，上限 8 条）；单曲建议点击**直接播放**，艺人/专辑/歌单进对应详情页；键盘 ↑↓ 在建议间移动（含"无选中"态的完整循环）、Enter 激活选中项或跳转完整搜索；清空输入立即清建议（不等防抖）。
+
+**搜索历史**（`utils/searchHistory.ts` + 6 单测）：localStorage 存最近 10 条、去重置顶、损坏数据降级为空；空查询时显示在历史区（热词上方）带清空按钮，点击词条直接搜索；提交时记录。
+
+**按 Tab 懒加载**：`useSearchBestMatch` / `useSearchResults` / `useSearchTracksInfinite` 增加 `enabled` 参数；Search 页 All 页发全部查询（各组预览需要），分类页只发本类——消除进页 5 并发，切 Tab 复用 React Query 缓存。
+
+### 验证
+
+- 单测 **13 文件 / 119 用例**全绿（+searchHistory 6）；`test:types` 0 error；lint 零新增（Search.tsx 5→0）
+- CDP 冒烟 **46/46 连续两轮**：新增场景 10——真实 suggest API 返回 8 条建议、Enter 跳搜索页、历史区含刚提交词条（注意 Spotlight 行为保留上次查询，断言历史前需清空输入）
+
+### 冒烟基建排障（§19 的补充，四条新经验）
+
+1. **固定 sleep 断言在高负载下必 flaky**：布局切换/弹窗退出是整树重挂载，机器繁忙时远超 1s——所有"异步达到某状态"的断言必须用条件轮询（脚本内置 `waitFor`）
+2. **headless 下 document 可能无焦点**：自动聚焦失效导致可信键盘事件无接收者——键盘断言前 `Page.bringToFront` + 显式 `focus()`
+3. **JS 合成 keydown 对 React 根监听器投递不可靠**：键盘事件用 CDP `Input.dispatchKeyEvent`（可信管道）；鼠标交互用 DOM `.click()` 依然可靠
+4. 重连时关闭全部旧 page target（遗留页面的 vite HMR 客户端持续耗渲染预算）
