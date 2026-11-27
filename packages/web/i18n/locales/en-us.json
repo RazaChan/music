@@ -149,7 +149,12 @@
       "local-shortcut-invalid": "Local Shortcut needs at least one modifier key and one non-modifier key",
       "restore-factory-settings": "Restore factory settings",
       "restore-factory-settings-success": "Factory settings restored"
-    }
+    },
+    "title-cache": "Cache",
+    "audio-cache": "Audio cache",
+    "api-cache": "API cache",
+    "clear-cache": "Clear",
+    "cache-cleared": "Cache cleared"
   },
   "context-menu": {
     "share": "Share",

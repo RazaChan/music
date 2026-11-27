@@ -55,11 +55,12 @@ CREATE TABLE IF NOT EXISTS "Playlist" (
 
 CREATE TABLE IF NOT EXISTS "Audio" (
     "id" INTEGER NOT NULL,
+    "level" TEXT NOT NULL DEFAULT 'exhigh',
     "bitRate" INTEGER NOT NULL,
     "format" TEXT NOT NULL,
     "source" TEXT NOT NULL,
     "queriedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+    PRIMARY KEY ("id", "level")
 );
 
 CREATE TABLE IF NOT EXISTS "Lyrics" (

@@ -149,7 +149,12 @@
       "local-shortcut-invalid": "应用内快捷键需要一个非修饰键和可选的若干个修饰键",
       "restore-factory-settings": "恢复默认设置",
       "restore-factory-settings-success": "快捷键已恢复为默认设置"
-    }
+    },
+    "title-cache": "缓存",
+    "audio-cache": "音频缓存",
+    "api-cache": "API 缓存",
+    "clear-cache": "清除",
+    "cache-cleared": "缓存已清除"
   },
   "context-menu": {
     "share": "分享",

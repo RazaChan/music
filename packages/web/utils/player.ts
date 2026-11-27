@@ -506,8 +506,10 @@ export class Player {
     if (isNaN(id) || !id) return
     // audio info
     const response = await fetchAudioSourceWithReactQuery({ id })
+    // 缓存按 (id, level) 键控 —— 用接口回报的实际档位（缓存命中时也是真实值）
+    const level = response?.data?.[0]?.level
     // 缓存
-    cacheAudio(id, audio, response?.data?.[0]?.br)
+    cacheAudio(id, audio, response?.data?.[0]?.br, level)
   }
 
   private async _nextFMTrack(autoplay: boolean = true) {

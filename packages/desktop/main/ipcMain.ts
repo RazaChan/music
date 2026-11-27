@@ -10,6 +10,7 @@ import { CacheAPIs } from '@/shared/CacheAPIs'
 import { YPMTray } from './tray'
 import { Thumbar } from './windowsTaskbar'
 import fastFolderSize from 'fast-folder-size'
+import fs from 'fs'
 import path from 'path'
 import prettyBytes from 'pretty-bytes'
 import { db, Tables } from './db'
@@ -179,7 +180,8 @@ function initStoreIpcMain(win: BrowserWindow | null,store: Store<TypedElectronSt
  */
 function initOtherIpcMain(win: BrowserWindow | null) {
   /**
-   * 清除API缓存
+   * 清除API缓存（不含音频缓存 —— 音频由 ClearAudioCache 连同磁盘文件一起管理，
+   * 避免"清了表、留下孤儿文件"）
    */
   on(IpcChannels.ClearAPICache, () => {
     db.truncate(Tables.Track)
@@ -188,7 +190,6 @@ function initOtherIpcMain(win: BrowserWindow | null) {
     db.truncate(Tables.Playlist)
     db.truncate(Tables.ArtistAlbum)
     db.truncate(Tables.AccountData)
-    db.truncate(Tables.Audio)
     db.vacuum()
   })
 
@@ -287,13 +288,37 @@ function initOtherIpcMain(win: BrowserWindow | null) {
   })
 
   /**
-   * 获取音频缓存文件夹大小
+   * 获取音频缓存文件夹大小。
+   * 用 handle（invoke 语义）返回 Promise<string> —— 原来是 on + 异步回调里写
+   * event.returnValue，sendSync 根本拿不到值。
    */
-  on(IpcChannels.GetAudioCacheSize, event => {
-    fastFolderSize(path.join(app.getPath('userData'), './audio_cache'), (error, bytes) => {
-      if (error) throw error
-      event.returnValue = prettyBytes(bytes ?? 0)
+  handle(IpcChannels.GetAudioCacheSize, () => {
+    return new Promise<string>(resolve => {
+      fastFolderSize(path.join(app.getPath('userData'), './audio_cache'), (error, bytes) => {
+        if (error) {
+          log.error('[ipc] GetAudioCacheSize failed', error)
+          resolve('0 B')
+          return
+        }
+        resolve(prettyBytes(bytes ?? 0))
+      })
     })
+  })
+
+  /**
+   * 清除音频缓存：删除 audio_cache 目录内全部文件 + 清空 Audio 表。
+   */
+  handle(IpcChannels.ClearAudioCache, async () => {
+    const audioCacheDir = path.join(app.getPath('userData'), './audio_cache')
+    try {
+      const files = await fs.promises.readdir(audioCacheDir)
+      await Promise.allSettled(files.map(file => fs.promises.unlink(path.join(audioCacheDir, file))))
+    } catch (error) {
+      // 目录不存在视为已清空
+      log.info('[ipc] ClearAudioCache: audio_cache dir not found, nothing to delete')
+    }
+    db.truncate(Tables.Audio)
+    db.vacuum()
   })
 
   /**

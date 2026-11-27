@@ -3,7 +3,10 @@ import persistedUiStates from '@/web/states/persistedUiStates'
 import settings from '@/web/states/settings'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
-import { BlockTitle, OptionText, Select, Option, Switch } from './Controls'
+import { useCallback, useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
+import { IpcChannels } from '@/shared/IpcChannels'
+import { BlockTitle, Button, OptionText, Select, Option, Switch } from './Controls'
 
 function General() {
   return (
@@ -13,6 +16,7 @@ function General() {
       <NeteaseMusic />
       <Download />
       <CloseWindow />
+      <Cache />
     </div>
   )
 }
@@ -120,6 +124,58 @@ function CloseWindow() {
           enabled={closeWindowInMinimize}
           onChange={v => (settings.closeWindowInMinimize = v)}
         />
+      </Option>
+    </div>
+  )
+}
+
+/**
+ * 缓存管理（仅桌面端：音频缓存只存在于 Electron 的本地服务里）。
+ */
+function Cache() {
+  const { t } = useTranslation()
+  const isElectron = !!window.ipcRenderer
+  const [audioCacheSize, setAudioCacheSize] = useState('')
+
+  const refreshAudioCacheSize = useCallback(async () => {
+    const size = await window.ipcRenderer?.invoke(IpcChannels.GetAudioCacheSize)
+    if (typeof size === 'string') setAudioCacheSize(size)
+  }, [])
+
+  useEffect(() => {
+    if (isElectron) refreshAudioCacheSize()
+  }, [isElectron, refreshAudioCacheSize])
+
+  if (!isElectron) return null
+
+  return (
+    <div className='mt-7 mb-12' data-testid='settings-cache'>
+      <BlockTitle>{t`settings.title-cache`}</BlockTitle>
+      <Option>
+        <OptionText>
+          {t`settings.audio-cache`}
+          {audioCacheSize ? ` · ${audioCacheSize}` : ''}
+        </OptionText>
+        <Button
+          onClick={async () => {
+            await window.ipcRenderer?.invoke(IpcChannels.ClearAudioCache)
+            toast.success(t`settings.cache-cleared`)
+            refreshAudioCacheSize()
+          }}
+        >
+          {t`settings.clear-cache`}
+        </Button>
+      </Option>
+      <Option>
+        <OptionText>{t`settings.api-cache`}</OptionText>
+        <Button
+          onClick={() => {
+            window.ipcRenderer?.send(IpcChannels.ClearAPICache)
+            toast.success(t`settings.cache-cleared`)
+          }}
+        >
+          {t`settings.clear-cache`}
+        </Button>
       </Option>
     </div>
   )

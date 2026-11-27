@@ -9,37 +9,40 @@ import youtube from '@/desktop/main/youtube'
 import { CacheAPIs } from '@/shared/CacheAPIs'
 import { FetchTracksResponse } from '@/shared/api/Track'
 import store from '@/desktop/main/store'
-import { db, Tables } from '@/desktop/main/db'
+import { db, Tables, TablesStructures } from '@/desktop/main/db'
 const match = require('@unblockneteasemusic/server')
 
 log.info('[electron] appServer/routes/r3play/audio.ts')
 
-const getAudioFromCache = async (id: number) => {
-  // get from cache
-  const cache = await db.find(Tables.Audio, id)
-  if (!cache) return
+/**
+ * 缓存查找：先按请求的 (id, level) 精确命中；未命中则降级到该曲目
+ * 已缓存的最高码率版本（本地播放更高音质无害），并如实上报实际档位。
+ */
+const getAudioFromCache = async (id: number, level: string) => {
+  const audioCache = db.findAudio(id, level) ?? db.findBestAudio(id)
+  if (!audioCache) return
 
-  const audioFileName = `${cache.id}-${cache.bitRate}.${cache.format}`
+  const audioFileName = `${audioCache.id}-${audioCache.bitRate}.${audioCache.format}`
 
   const isAudioFileExists = fs.existsSync(`${app.getPath('userData')}/audio_cache/${audioFileName}`)
   if (!isAudioFileExists) return
 
-  log.debug(`[server] Audio cache hit ${id}`)
+  log.debug(`[server] Audio cache hit ${id} (level=${audioCache.level})`)
 
   return {
     data: [
       {
-        source: cache.source,
-        id: cache.id,
+        source: audioCache.source,
+        id: audioCache.id,
         url: `http://127.0.0.1:${
           process.env.ELECTRON_WEB_SERVER_PORT
         }/${appName.toLowerCase()}/audio/${audioFileName}`,
-        br: cache.bitRate,
+        br: audioCache.bitRate,
         size: 0,
         md5: '',
         code: 200,
         expi: 0,
-        type: cache.format,
+        type: audioCache.format,
         gain: 0,
         fee: 8,
         uf: null,
@@ -47,8 +50,9 @@ const getAudioFromCache = async (id: number) => {
         flag: 4,
         canExtend: false,
         freeTrialInfo: null,
-        level: 'standard',
-        encodeType: cache.format,
+        // 如实上报缓存文件的实际档位，不再硬编码 'standard'
+        level: audioCache.level,
+        encodeType: audioCache.format,
         freeTrialPrivilege: {
           resConsumable: false,
           userConsumable: false,
@@ -157,11 +161,10 @@ async function audio(fastify: FastifyInstance) {
           msg: 'id is required or id is invalid',
         })
       }
+      // 与前端 fetchAudioSource 的默认档位一致
+      const level = req.query.level || 'exhigh'
 
-      // const res = getAudioFromYouTube(id)
-      // console.log('youtube ',res);
-
-      const localCache = await getAudioFromCache(id)
+      const localCache = await getAudioFromCache(id, level)
       if (localCache) {
         return localCache
       }
@@ -189,8 +192,8 @@ async function audio(fastify: FastifyInstance) {
       // console.log(fromNetease);
 
       const trackID = id
-      // 先查缓存
-      const cacheData = await cache.get(CacheAPIs.Unblock, trackID)
+      // 先查缓存（参数形状对齐 cache.get 的 params.id 读取）
+      const cacheData = await cache.get(CacheAPIs.Unblock, { id: trackID })
       if (cacheData) {
         return cacheData
       }
@@ -238,7 +241,10 @@ async function audio(fastify: FastifyInstance) {
           if (fromNetease?.data?.[0]?.freeTrialInfo) {
             fromNetease.data[0].url = ''
           }
-          return reply.status(fromNetease?.code ?? 500).send(fromNetease)
+          // fromNetease 可能为 undefined（官方请求失败），兜底避免空响应体
+          return reply
+            .status(fromNetease?.code ?? 500)
+            .send(fromNetease ?? { code: 500, message: 'no track info' })
         }
 
         cache.set(CacheAPIs.Unblock, { id: trackID, url: data?.url }, trackID)
@@ -252,32 +258,34 @@ async function audio(fastify: FastifyInstance) {
         if (fromNetease?.data?.[0]?.freeTrialInfo) {
           fromNetease.data[0].url = ''
         }
-        return reply.status(fromNetease?.code ?? 500).send(fromNetease)
+        return reply
+          .status(fromNetease?.code ?? 500)
+          .send(fromNetease ?? { code: 500, message: String(err) })
       }
     }
   )
 
-  // 获取缓存的音频数据
+  // 获取缓存的音频数据（支持 Range 分段）
   fastify.get(
     `/${appName.toLowerCase()}/audio/:filename`,
     (req: FastifyRequest<{ Params: { filename: string } }>, reply) => {
       const filename = req.params.filename
-      cache.getAudio(filename, reply)
+      cache.getAudio(filename, reply, req.headers.range)
     }
   )
 
-  // 缓存音频数据
+  // 缓存音频数据（流式落盘）
   fastify.post(
     `/${appName.toLowerCase()}/audio/:id`,
     async (
       req: FastifyRequest<{
         Params: { id: string }
-        Querystring: { url: string; bitrate: number }
+        Querystring: { url: string; bitrate: number; level: string }
       }>,
       reply
     ) => {
       const id = Number(req.params.id)
-      const { url, bitrate } = req.query
+      const { url, level } = req.query
       if (isNaN(id)) {
         return reply.status(400).send({ error: 'Invalid param id' })
       }
@@ -292,7 +300,11 @@ async function audio(fastify: FastifyInstance) {
       }
 
       try {
-        await cache.setAudio(await data.toBuffer(), { id, url, bitrate })
+        await cache.setAudio(data.file, {
+          id,
+          url,
+          level: (level || 'exhigh') as TablesStructures[Tables.Audio]['level'],
+        })
         reply.status(200).send('Audio cached!')
       } catch (error) {
         reply.status(500).send({ error })

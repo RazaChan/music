@@ -349,3 +349,39 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 - ✅ 移动队列可打开、操作、关闭（§11，冒烟 S3）
 - ✅ 账号切换不泄漏上一账号 UI 数据（§11，结算感知缓存清理）
 - ✅ 统一未登录/加载/空/错误状态（本节，冒烟 S4）
+
+## 13. 阶段 2 第一批落地记录（2026-11-27）—— 音频缓存契约收敛
+
+路线文档阶段 2 前置批次（用户决策：缓存契约优先、桌面优先）。为批次 2（音质选择 UI）铺路。
+
+### 交付内容
+
+**Audio 表 schema 升级（两端 db.ts + init.sql）**：新增 `level` 列、主键改为 `(id, level)`。不走 `migrate()` 机制（其版本语义从未被实测），改在 `initTables()` 内做 table_info 特性检测 + 事务内重建表；legacy 行补 `level='exhigh'`（与历史请求一致）。判定与 SQL 抽为纯函数 `utils/audioSchema.ts`（desktop 有单测）。
+
+**DB.update() 实装（desktop 原为空实现）**：参数化 SET、过滤 undefined；命中缓存时 `queriedAt` 更新从此生效（LRU 地基）。新增 `findAudio(id, level)` 精确查询与 `findBestAudio(id)` 降级查询。**注意**：`upsert/upsertMany` 改为显式列名——原位置 VALUES 在复合主键新列序下会把数据写错列。
+
+**缓存查找与 DTO（两端路由）**：按 `(id, level)` 精确命中，未命中降级到该曲目最高码率缓存；命中 DTO 的 `level` 用真实存储值（原硬编码 `'standard'`）。桌面失败回退 `send(undefined)`（空响应体）对齐为服务端的 `?? {code:500,...}` 兜底。
+
+**真实 Range 流式（两端 cache.ts）**：`parseRangeHeader` 纯函数（desktop 10 个单测）+ `fs.createReadStream`；200 全量 / 206 分段（正确 Content-Range/Content-Length）/ 416。替换原"整文件 readFileSync + 假 206"。`resolveCacheAudioPath` 安全红线保持在校验链最前。
+
+**流式落盘（两端 setAudio）**：multipart 流 → 临时文件 → `parseFile` → 重命名 → 写库（含 level），不再 `toBuffer()` 整文件驻留内存；元数据解析失败按 unknown 容错（两端对齐）；**bitrate 四舍五入取整**——原浮点码率会生成 `{id}-320000.04.mp3` 这类文件名，读取时过不了白名单正则（潜在 bug 修复）。
+
+**Unblock 缓存读修复（两端）**：调用方改传 `{id}`（原传 number 永不命中）；命中 DTO 改为 `{code, data:[{url}]}`（原返回 `album` 字段的错形状）。此前该表只写不读、持续累积死数据。
+
+**IPC 与缓存管理**：`GetAudioCacheSize` 从 `on`+异步 `returnValue`（sendSync 拿不到值）改为 `handle` 返回 string；新增 `ClearAudioCache`（删 audio_cache 全部文件 + 清 Audio 表）；`ClearAPICache` 不再 truncate Audio（消除孤儿文件来源）；IpcChannels 三处同步。设置页 General 新增「缓存」区块（仅 Electron 渲染）：音频缓存占用显示 + 清除、API 缓存清除。
+
+**level 写入链**：`player._cacheAudio` 从音源响应取实际 level → `r3play.cacheAudio` 加参数 → POST query → 入库。
+
+### 验证
+
+- desktop vitest：4 文件 / 22 用例全绿（+audioRange 10、audioSchema 3）；web 96 用例不回归
+- 类型：web 0 error；desktop 维持 34 基线（新增的两个 findAudio/findBestAudio 已补 as 断言回落）；server `tsc --noEmit` 0 error
+- lint：全部改动文件零新增，其中 4 个文件因删死代码反而减少
+- **curl 端到端（桌面 dev，vite 代理 → appServer）**：POST 流式缓存写入 200；`level=exhigh` 命中且如实上报；`level=standard` 降级命中 exhigh 并如实上报；Range 0-1023 → 206/1024 字节/Content-Range 正确；无 Range → 200 全量；后缀 -100 → 206/100 字节；越界 → 416 `bytes */8192`；全量与分段内容均与源字节一致；命中后 DB `queriedAt` 实际更新；dev DB 的 schema 升级在 Electron 重启时自动完成
+- CDP 冒烟 24/24 回归通过
+
+### 注意事项
+
+- dev 环境 vite 代理路径是 `/r3playx/`（appName 小写），桌面 appServer 在 dev 下由 30001 承载——curl 验证时别打成 `/r3play/`
+- 双实现新漂移点已消除：桌面回退兜底、元数据容错；仍为平台差异的：源列表 / cookie 来源 / YouTube 链（见 §12 前的对照表，桌面优先决策下保留）
+- server 端无测试基建，audioRange/audioSchema 为 desktop 测试覆盖的同构副本，改动需两端同步

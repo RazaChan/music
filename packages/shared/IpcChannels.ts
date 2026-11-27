@@ -36,6 +36,7 @@ export const enum IpcChannels {
   SyncTheme = 'SyncTheme',
   SyncAccentColor = 'SyncAccentColor',
   GetAudioCacheSize = 'GetAudioCacheSize',
+  ClearAudioCache = 'ClearAudioCache',
   ResetWindowSize = 'ResetWindowSize',
   GetAlbumFromAppleMusic = 'GetAlbumFromAppleMusic',
   GetArtistFromAppleMusic = 'GetArtistFromAppleMusic',
@@ -104,6 +105,7 @@ export interface IpcChannelsParams {
     theme: string
   }
   [IpcChannels.GetAudioCacheSize]: void
+  [IpcChannels.ClearAudioCache]: void
   [IpcChannels.ResetWindowSize]: void
   [IpcChannels.GetAlbumFromAppleMusic]: {
     id: number
@@ -161,7 +163,8 @@ export interface IpcChannelsReturns {
   [IpcChannels.SyncTheme]: {
     theme: string
   }
-  [IpcChannels.GetAudioCacheSize]: void
+  [IpcChannels.GetAudioCacheSize]: string
+  [IpcChannels.ClearAudioCache]: void
   [IpcChannels.ResetWindowSize]: void
   [IpcChannels.GetAlbumFromAppleMusic]: AppleMusicAlbum | undefined
   [IpcChannels.GetArtistFromAppleMusic]: AppleMusicArtist | undefined

@@ -6,6 +6,8 @@ import { IAudioMetadata } from 'music-metadata'
 import { CacheAPIs, CacheAPIsParams } from '../../../shared/CacheAPIs'
 import { FastifyReply } from 'fastify'
 import { dirname } from './utils'
+import { parseRangeHeader } from './audioRange'
+import { pipeline } from 'stream/promises'
 import path from 'path'
 
 log.info('[electron] cache.ts')
@@ -185,13 +187,12 @@ class Cache {
       }
       case CacheAPIs.Unblock: {
         if (isNaN(Number(params?.id))) return
-        const data = db.find(Tables.Unblock, params.id)
+        const data = db.find(Tables.Unblock, Number(params.id))
         if (data?.json)
+          // 与 /song/url/v1 消费方期望的形状一致：{ code, data: [{ url, ... }] }
           return {
-            resourceState: true,
-            songs: [],
             code: 200,
-            album: JSON.parse(data.json),
+            data: [JSON.parse(data.json)],
           }
         break
       }
@@ -266,7 +267,11 @@ class Cache {
     }
   }
 
-  getAudio(fileName: string, reply: FastifyReply) {
+  /**
+   * 流式返回缓存的音频文件，支持真实 Range 请求。与 desktop 侧同构。
+   * filename 白名单校验先于任何 fs 操作（防路径穿越）。
+   */
+  getAudio(fileName: string, reply: FastifyReply, rangeHeader?: string) {
     if (!fileName) {
       return reply.status(400).send({ error: 'No filename provided' })
     }
@@ -276,73 +281,115 @@ class Cache {
       return reply.status(400).send({ error: 'Invalid filename' })
     }
     const id = Number(fileName.split('-')[0])
+    const filePath = `${AUDIO_CACHE_DIR}/${fileName}`
 
+    let size: number
     try {
-      const filePath = `${AUDIO_CACHE_DIR}/${fileName}`
-      const audio = fs.readFileSync(filePath)
-      if (audio.byteLength === 0) {
-        db.delete(Tables.Audio, id)
-        fs.unlinkSync(filePath)
-        return reply.status(404).send({ error: 'Audio not found' })
-      }
-      db.update(Tables.Audio, id, { queriedAt: Date.now() })
-      reply
-        .status(206)
-        .header('Accept-Ranges', 'bytes')
-        .header('Connection', 'keep-alive')
-        .header('Content-Range', `bytes 0-${audio.byteLength - 1}/${audio.byteLength}`)
-        .send(audio)
-    } catch (error) {
-      reply.status(500).send({ error })
+      size = fs.statSync(filePath).size
+    } catch {
+      // 表里有记录但文件已丢失 —— 清掉记录，按未命中处理
+      db.delete(Tables.Audio, id)
+      return reply.status(404).send({ error: 'Audio not found' })
     }
+    if (size === 0) {
+      db.delete(Tables.Audio, id)
+      try {
+        fs.unlinkSync(filePath)
+      } catch {
+        /* ignore */
+      }
+      return reply.status(404).send({ error: 'Audio not found' })
+    }
+
+    // 命中即触碰 queriedAt（作为 LRU 依据）
+    db.update(Tables.Audio, id, { queriedAt: Date.now() })
+
+    const range = parseRangeHeader(rangeHeader, size)
+    if (range === 'invalid') {
+      return reply
+        .status(416)
+        .header('Content-Range', `bytes */${size}`)
+        .send({ error: 'Requested range not satisfiable' })
+    }
+    if (range === null) {
+      return reply
+        .status(200)
+        .header('Accept-Ranges', 'bytes')
+        .header('Content-Length', size)
+        .header('Content-Type', 'application/octet-stream')
+        .send(fs.createReadStream(filePath))
+    }
+    return reply
+      .status(206)
+      .header('Accept-Ranges', 'bytes')
+      .header('Content-Range', `bytes ${range.start}-${range.end}/${size}`)
+      .header('Content-Length', range.end - range.start + 1)
+      .header('Content-Type', 'application/octet-stream')
+      .send(fs.createReadStream(filePath, { start: range.start, end: range.end }))
   }
 
+  /**
+   * 流式落盘缓存音频：multipart 流 → 临时文件 → 解析元数据 → 重命名 → 写库。
+   * 不再 toBuffer() 整文件驻留内存；元数据解析失败按 unknown 容错落盘。
+   */
   async setAudio(
-    buffer: Buffer,
-    { id, url, bitrate }: { id: number; url: string; bitrate: number }
+    file: NodeJS.ReadableStream,
+    {
+      id,
+      url,
+      level,
+    }: { id: number; url: string; level: TablesStructures[Tables.Audio]['level'] }
   ) {
-    try {
-      fs.statSync(AUDIO_CACHE_DIR)
-    } catch (e) {
-      fs.mkdirSync(AUDIO_CACHE_DIR, { recursive: true })
-    }
-    const { parseBuffer } = await import('music-metadata')
-    let meta: IAudioMetadata | undefined
-    try {
-      meta = await parseBuffer(buffer)
-    } catch (e) {
-      log.error('[cache] parse audio metadata failed', e)
-    }
-    const bitRate = meta?.format?.codec === 'OPUS' ? 165000 : meta?.format?.bitrate ?? 0
-    const type =
-      {
-        'MPEG 1 Layer 3': 'mp3',
-        'Ogg Vorbis': 'ogg',
-        AAC: 'm4a',
-        FLAC: 'flac',
-        OPUS: 'opus',
-      }[meta?.format?.codec ?? ''] ?? 'unknown'
+    await fs.promises.mkdir(AUDIO_CACHE_DIR, { recursive: true })
 
-    let source: TablesStructures[Tables.Audio]['source'] = 'unknown'
-    if (url.includes('googlevideo.com')) source = 'youtube'
-    if (url.includes('126.net')) source = 'netease'
+    const tempPath = path.join(AUDIO_CACHE_DIR, `${id}.download`)
+    try {
+      await pipeline(file, fs.createWriteStream(tempPath))
 
-    fs.writeFile(`${AUDIO_CACHE_DIR}/${id}-${bitRate}.${type}`, buffer, error => {
-      if (error) {
-        return log.error(`[cache] cacheAudio failed: ${error}`)
+      const { parseFile } = await import('music-metadata')
+      let meta: IAudioMetadata | undefined
+      try {
+        meta = await parseFile(tempPath)
+      } catch (e) {
+        log.error('[cache] parse audio metadata failed', e)
       }
-      log.info(`Audio file ${id}-${bitRate}.${type} cached!`)
+      // bitrate 是浮点（VBR），四舍五入取整 —— 文件名必须是 `{id}-{整数}.{ext}`
+      // 才能通过读取侧的白名单校验
+      const bitRate = meta?.format?.codec === 'OPUS' ? 165000 : Math.round(meta?.format?.bitrate ?? 0)
+      const type =
+        {
+          'MPEG 1 Layer 3': 'mp3',
+          'Ogg Vorbis': 'ogg',
+          AAC: 'm4a',
+          FLAC: 'flac',
+          OPUS: 'opus',
+        }[meta?.format?.codec ?? ''] ?? 'unknown'
+
+      let source: TablesStructures[Tables.Audio]['source'] = 'unknown'
+      if (url.includes('googlevideo.com')) source = 'youtube'
+      if (url.includes('126.net')) source = 'netease'
+
+      const fileName = `${id}-${bitRate}.${type}`
+      await fs.promises.rename(tempPath, path.join(AUDIO_CACHE_DIR, fileName))
 
       db.upsert(Tables.Audio, {
         id,
+        level,
         bitRate,
         format: type as TablesStructures[Tables.Audio]['format'],
         source,
         queriedAt: Date.now(),
       })
-
-      log.info(`[cache] cacheAudio ${id}-${bitRate}.${type}`)
-    })
+      log.info(`[cache] audio cached: ${fileName} (level=${level})`)
+    } catch (error) {
+      try {
+        await fs.promises.unlink(tempPath)
+      } catch {
+        /* ignore */
+      }
+      log.error(`[cache] cacheAudio failed: ${error}`)
+      throw error
+    }
   }
 }
 const cache = new Cache()

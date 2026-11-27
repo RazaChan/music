@@ -4,15 +4,19 @@ import log from '../../utils/log'
 import cache, { AUDIO_CACHE_DIR } from '../../utils/cache'
 import { CacheAPIs } from '../../../../shared/CacheAPIs'
 import fs from 'fs'
-import { db, Tables } from '../../utils/db'
+import { db, Tables, TablesStructures } from '../../utils/db'
 import pkg from '../../../../../package.json'
 const match = require('@unblockneteasemusic/server')
 
 log.info('[server] appServer/routes/netease/audio.ts')
 
-export const getAudioFromCache = async (id: number) => {
-  // get from cache
-  const audioCache = await db.find(Tables.Audio, id)
+/**
+ * 缓存查找：先按请求的 (id, level) 精确命中；未命中则降级到该曲目
+ * 已缓存的最高码率版本（本地播放更高音质无害），并如实上报实际档位。
+ * 与 desktop 侧同构。
+ */
+export const getAudioFromCache = async (id: number, level: string) => {
+  const audioCache = db.findAudio(id, level) ?? db.findBestAudio(id)
   if (!audioCache) return
 
   const audioFileName = `${audioCache.id}-${audioCache.bitRate}.${audioCache.format}`
@@ -20,7 +24,7 @@ export const getAudioFromCache = async (id: number) => {
   const isAudioFileExists = fs.existsSync(`${AUDIO_CACHE_DIR}/${audioFileName}`)
   if (!isAudioFileExists) return
 
-  log.debug(`[server] Audio cache hit ${id}`)
+  log.debug(`[server] Audio cache hit ${id} (level=${audioCache.level})`)
 
   // 桌面端（Electron 内）返回本地服务器地址；独立部署时返回同源相对路径，交给反向代理转发
   const audioURL = process.versions.electron
@@ -48,7 +52,8 @@ export const getAudioFromCache = async (id: number) => {
         flag: 4,
         canExtend: false,
         freeTrialInfo: null,
-        level: 'standard',
+        // 如实上报缓存文件的实际档位，不再硬编码 'standard'
+        level: audioCache.level,
         encodeType: audioCache.format,
         freeTrialPrivilege: {
           resConsumable: false,
@@ -151,8 +156,10 @@ async function audio(fastify: FastifyInstance) {
           msg: 'id is required or id is invalid',
         })
       }
+      // 与前端 fetchAudioSource 的默认档位一致
+      const level = req.query.level || 'exhigh'
 
-      const localCache = await getAudioFromCache(id)
+      const localCache = await getAudioFromCache(id, level)
       if (localCache) {
         return localCache
       }
@@ -178,8 +185,8 @@ async function audio(fastify: FastifyInstance) {
       }
 
       const trackID = id
-      // 先查缓存
-      const cacheData = await cache.get(CacheAPIs.Unblock, trackID)
+      // 先查缓存（参数形状对齐 cache.get 的 params.id 读取）
+      const cacheData = await cache.get(CacheAPIs.Unblock, { id: trackID })
       if (cacheData) {
         return cacheData
       }
@@ -233,27 +240,27 @@ async function audio(fastify: FastifyInstance) {
     }
   )
 
-  // 获取缓存的音频数据
+  // 获取缓存的音频数据（支持 Range 分段）
   fastify.get(
     `/${pkg.name.toLowerCase()}/audio/:filename`,
     (req: FastifyRequest<{ Params: { filename: string } }>, reply) => {
       const filename = req.params.filename
-      cache.getAudio(filename, reply)
+      cache.getAudio(filename, reply, req.headers.range)
     }
   )
 
-  // 缓存音频数据
+  // 缓存音频数据（流式落盘）
   fastify.post(
     `/${pkg.name.toLowerCase()}/audio/:id`,
     async (
       req: FastifyRequest<{
         Params: { id: string }
-        Querystring: { url: string; bitrate: number }
+        Querystring: { url: string; bitrate: number; level: string }
       }>,
       reply
     ) => {
       const id = Number(req.params.id)
-      const { url, bitrate } = req.query
+      const { url, level } = req.query
       if (isNaN(id)) {
         return reply.status(400).send({ error: 'Invalid param id' })
       }
@@ -268,7 +275,11 @@ async function audio(fastify: FastifyInstance) {
       }
 
       try {
-        await cache.setAudio(await data.toBuffer(), { id, url, bitrate })
+        await cache.setAudio(data.file, {
+          id,
+          url,
+          level: (level || 'exhigh') as TablesStructures[Tables.Audio]['level'],
+        })
         reply.status(200).send('Audio cached!')
       } catch (error) {
         reply.status(500).send({ error })

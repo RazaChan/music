@@ -7,7 +7,7 @@ const request: AxiosInstance = axios.create({
   timeout: 15000,
 })
 
-export async function cacheAudio(id: number, audioUrl: string, bitrate?: number) {
+export async function cacheAudio(id: number, audioUrl: string, bitrate?: number, level?: string) {
   const file = await axios.get(audioUrl, { responseType: 'arraybuffer' })
   if (file.status !== 200 && file.status !== 206) return
 
@@ -22,6 +22,8 @@ export async function cacheAudio(id: number, audioUrl: string, bitrate?: number)
     params: {
       url: audioUrl,
       bitrate,
+      // 缓存按 (id, level) 键控，写入时带上实际请求的音质档位
+      level: level ?? 'exhigh',
     },
   })
 }
