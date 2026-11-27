@@ -220,10 +220,10 @@
 }
 
 .bg-brand-50 {
-  background-color: hsl(var-(-brand-color-50));
+  background-color: hsl(var(--brand-color-50));
 }
 .bg-brand-100 {
-  background-color: hsl(var-(-brand-color-100));
+  background-color: hsl(var(--brand-color-100));
 }
 .bg-brand-200 {
   background-color: hsl(var(--brand-color-200));

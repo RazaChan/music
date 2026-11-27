@@ -42,7 +42,7 @@ const Browse = memo(() => {
         )}
       >
         {/* Tabs 固定顶部 - 始终可见，有背景色防止内容穿透 */}
-        <div className='bg-background z-20 mb-2.5 px-2.5 pt-2'>
+        <div className='z-20 mb-2.5 px-2.5 pt-2'>
           <Tabs
             tabs={categories.map(c => ({ id: c.id, name: c.name }))}
             value={active}

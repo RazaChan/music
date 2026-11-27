@@ -46,6 +46,8 @@ const Track = memo(({
             alt='Cover'
             className='mr-4 aspect-square h-14 w-14 shrink-0 rounded-12'
             src={resizeImage(track?.al?.picUrl || '', 'sm')}
+            loading='lazy'
+            decoding='async'
           />
   
           {/* Track Name and Artists */}
@@ -65,9 +67,9 @@ const Track = memo(({
               )}
             </div>
             <div className='line-clamp-1 mt-1 text-14 font-bold '>
-              {track?.ar.map((a, index) => (
-                <Fragment key={a.id + Math.random() * 3.14159}>
-                  {index > 0 && ', '}
+              {track?.ar.map((a, idx) => (
+                <Fragment key={`${a.id}-${idx}`}>
+                  {idx > 0 && ', '}
                   <NavLink
                     className='transition-all duration-200 hover:text-black/70 dark:hover:text-white/70'
                     to={`/artist/${a.id}`}

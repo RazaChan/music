@@ -26,7 +26,8 @@ const settingsInStorage = localStorage.getItem('settings')
 const settings = settingsInStorage ? JSON.parse(settingsInStorage) : {}
 
 changeTheme(resolveTheme(settings.theme))
-changeAccentColor(settings?.accentColor || 'lime')
+// fallback 与 states/settings.ts 的默认值保持一致（此前是 lime，设置页却显示 yellow）
+changeAccentColor(settings?.accentColor || 'yellow')
 
 // 主题为「跟随系统」时，系统深浅色变化即时跟随。
 // 直接读 localStorage 而非 states/settings —— 本模块在 store 初始化前就被导入。

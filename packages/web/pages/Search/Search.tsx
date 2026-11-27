@@ -346,7 +346,7 @@ const Search = () => {
                   <div
                     onClick={() => navigateBestMatch(match)}
                     key={`${match.id}${match.picUrl}`}
-                    className='btn-hover-animation flex cursor-pointer items-center py-3 after:rounded-xl after:bg-gray-100 dark:after:bg-white/10'
+                    className='flex cursor-pointer items-center py-3 after:rounded-xl after:bg-gray-100 dark:after:bg-white/10'
                   >
                     <img
                       src={resizeImage(match.picUrl, 'xs')}

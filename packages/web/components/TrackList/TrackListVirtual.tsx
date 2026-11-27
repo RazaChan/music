@@ -1,126 +1,11 @@
-import Icon from '@/web/components/Icon'
-import Wave from '@/web/components/Animation/Wave'
 import player from '@/web/states/player'
-import { formatDuration, resizeImage } from '@/web/utils/common'
 import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
-import { State as PlayerState } from '@/web/utils/player'
-import { css, cx } from '@emotion/css'
-import { Fragment, memo, useCallback, useMemo } from 'react'
-import { NavLink } from 'react-router-dom'
+import { cx } from '@emotion/css'
+import { useCallback, useMemo } from 'react'
 import { useSnapshot } from 'valtio'
 import React from 'react'
-import settings from '@/web/states/settings'
-import { downloadTrack } from '@/web/utils/download'
 import { Virtuoso } from 'react-virtuoso'
-
-
-
-const Track = memo(({
-  track,
-  index,
-  isPlaying,
-  state,
-  onClick,
-}: {
-  track?: Track
-  index: number
-  isPlaying: boolean
-  state: PlayerState
-  onClick: (e: TrackRowEvent, trackID: number) => void
-}) => {
-  const { showDownloadActions } = useSnapshot(settings)
-  return (
-    <div
-      className={cx(
-        'group p-1 mb-3 grid duration-300 hover:bg-black/5 dark:hover:bg-white/5 rounded-12',
-        'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5',
-        css`
-          grid-template-columns: 3fr 2fr 1fr;
-        `
-      )}
-      tabIndex={0}
-      onClick={e => track && onClick(e, track.id)}
-      onContextMenu={e => track && onClick(e, track.id)}
-      onKeyDown={e => track && onClick(e, track.id)}
-    >
-      {/* Right part */}
-      <div className='flex items-center'>
-        {/* Cover */}
-        <img
-          alt='Cover'
-          className='mr-4 aspect-square h-14 w-14 shrink-0 rounded-12'
-          src={resizeImage(track?.al?.picUrl || '', 'sm')}
-          loading='lazy'
-          decoding='async'
-        />
-
-        {/* Track Name and Artists */}
-        <div className='mr-3'>
-          <div
-            className={cx(
-              'line-clamp-1 flex items-center text-16 font-medium transition-colors duration-500',
-              isPlaying ? 'text-brand-700' : 'text-neutral-700 dark:text-neutral-200'
-            )}
-          >
-            {track?.name}
-
-            {[1318912, 1310848].includes(track?.mark || 0) && (
-              <Icon name='explicit' className='ml-2 mt-px mr-4 h-3.5 w-3.5 ' />
-            )}
-          </div>
-          <div className='line-clamp-1 mt-1 text-14 font-bold '>
-            {track?.ar.map((a, idx) => (
-              <Fragment key={`${a.id}-${idx}`}>
-                {idx > 0 && ', '}
-                <NavLink
-                  className='transition-all duration-200 hover:text-black/70 dark:hover:text-white/70'
-                  to={`/artist/${a.id}`}
-                >
-                  {a.name}
-                </NavLink>
-              </Fragment>
-            ))}
-          </div>
-        </div>
-
-        {/* Wave icon */}
-        {isPlaying && (
-          <div className='ml-5'>
-            <Wave playing={state === 'playing'} />
-          </div>
-        )}
-      </div>
-
-      {/* Album Name */}
-      <div className='flex items-center'>
-        <NavLink
-          to={`/album/${track?.al?.id}`}
-          className='line-clamp-1 text-14 font-bold transition-colors duration-200 hover:text-black/70 dark:hover:text-white/70'
-        >
-          {track?.al?.name}
-        </NavLink>
-      </div>
-
-      {/* Duration */}
-      <div className='line-clamp-1 flex items-center justify-end text-14 font-bold'>
-        {/* Download — opt-in via settings.showDownloadActions */}
-        {showDownloadActions && track && (
-          <button
-            className='mr-2 flex h-8 w-8 items-center justify-center rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 hover:bg-black/30 dark:hover:bg-white/30'
-            onClick={e => {
-              e.stopPropagation()
-              downloadTrack(track.id)
-            }}
-          >
-            <Icon name='download' className='h-4 w-4' />
-          </button>
-        )}
-        {formatDuration(track?.dt || 0, 'en-US', 'hh:mm:ss')}
-      </div>
-    </div>
-  )
-})
-Track.displayName = 'TrackListVirtualTrack'
+import TrackRow from './Track'
 
 function TrackList({
   tracks,
@@ -167,13 +52,13 @@ function TrackList({
         itemContent={index => {
           const track = tracks?.[index]
           return (
-            <Track
+            <TrackRow
               key={track?.id ?? index}
               track={track}
               index={index}
-              isPlaying={!!track && track.id === trackID}
+              playingTrackID={trackID}
               state={state}
-              onClick={handleClick}
+              handleClick={handleClick}
             />
           )
         }}

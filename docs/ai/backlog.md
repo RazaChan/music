@@ -478,3 +478,26 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 
 - 单测 109 全绿；`test:types` 0 error；lint 零新增（TopbarMobile 2→0、Appearance 7→6）
 - CDP 冒烟 **39/39**：新增场景 8——Discover 页有顶栏（此前仅首页）、一级页无返回按钮、设置页有返回且点击回到上一页、主题切"跟随系统"持久化且 body class 已解析为具体主题
+
+## 18. 阶段 3 第三批落地记录（2026-11-27）—— 令牌收敛与安全的组件归并
+
+### 交付内容
+
+**令牌修复**：
+- `accentColor.css` 两处 `var-(-brand-color-*)` 笔误 → `var(--brand-color-*)`（`bg-brand-50/100` 此前完全失效）
+- 默认强调色一致：`theme.ts` 无存储时的 fallback 从 `lime` 改为 `yellow`，与 `states/settings.ts` 默认值对齐（此前首次启动实际显示 lime、设置页却选中 yellow）
+- 死类清理：`bg-background`（Browse，从未生效，移除保持现状视觉）、`btn-hover-animation`（Search，hover 背景本就由 `after:` 类承担）
+- `PlayingNext` 序号 `text-accent-color`（无定义）→ `text-accent-color-500`，还原"序号用强调色"的原始意图（轻微视觉变化，符合强调色=状态语言的设计 DNA）
+
+**组件归并（安全范围）**：`TrackListVirtual` 删除约 100 行内部行组件复制（189→74 行），改用共享 `Track.tsx`（统一 props：`playingTrackID` 替代 `isPlaying`）。共享行顺带获得两个小改进：封面 `loading=lazy decoding=async`、艺人 Fragment 的稳定 key（原 `Math.random()` key 每次渲染强制重挂载）。
+
+### 明确不做（决策记录）
+
+- **MediaGrid / CoverWall / CoverRowVirtual / MediaDetailHeader 大归并**：这些组件带性能调优历史（ImageManager 预载、虚拟化参数、容器查询），当前无新需求驱动，回归风险大于收益。触发条件：新增内容区块需求出现时，以共享 `MediaCard` 为目标顺手收敛
+- **gray 色阶"全同值"**：global.css 注释明确是 Tailwind v4 迁移时的刻意选择（整个命名空间替换为近黑），非 bug，不动
+- **brand / accent-color 双轨合并**：涉及全局类名替换，留待有视觉回归手段（截图对比）时做
+
+### 验证
+
+- 单测 109 全绿；`test:types` 0 error；lint 零新增（TrackListVirtual 1→0）
+- CDP 冒烟 **39/39** 回归通过

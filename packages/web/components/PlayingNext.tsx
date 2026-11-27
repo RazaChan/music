@@ -208,7 +208,7 @@ const Track = memo(
         {isPlaying ? (
           <Wave playing={isPlayingState} />
         ) : (
-          <div className='text-accent-color text-16 font-medium dark:text-neutral-200'>
+          <div className='text-accent-color-500 text-16 font-medium dark:text-neutral-200'>
             {String(index + 1).padStart(2, '0')}
           </div>
         )}
