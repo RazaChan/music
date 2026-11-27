@@ -37,7 +37,7 @@ const Browse = memo(() => {
         className={cx(
           'flex flex-col',
           css`
-            height: calc(100vh - 132px);
+            height: calc(100dvh - 132px);
           `
         )}
       >

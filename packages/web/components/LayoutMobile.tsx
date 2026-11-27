@@ -37,6 +37,7 @@ const LayoutMobile = () => {
             <Router />
           </main>
           <div
+            data-testid='mobile-bottom-bar'
             className={cx('fixed bottom-0 left-0 right-0 z-20 bg-white pt-3 dark:bg-black')}
             style={{
               paddingBottom: `calc(

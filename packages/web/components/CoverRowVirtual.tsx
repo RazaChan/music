@@ -419,7 +419,7 @@ const CoverRow = ({
       return { height: '100%', ...style }
     }
     return {
-      height: 'calc(100vh - 132px)',
+      height: 'calc(100dvh - 132px)',
       ...style,
     }
   }, [dynamicHeight, style])

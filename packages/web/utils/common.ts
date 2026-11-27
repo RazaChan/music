@@ -202,13 +202,16 @@ export const isIosPwa = isIOS && isPWA() && isSafari
 export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 /**
- * 移动布局断点（px）。useIsMobile 与曲目激活规则共用这一个真源，
- * 改断点时两边行为保持一致。
+ * 布局断点（px）：窗口宽度 <= 该值时使用移动布局与触屏交互规则。
+ * 与 Tailwind 的 lg（1024px）对齐 —— 桌面布局的侧栏/右栏播放器都定义在
+ * lg 以上，此前断点是 768，导致 769–1023px 落入"桌面壳层但没有播放器"
+ * 的死区。useIsMobile（布局选择）与 isMobileViewport（交互规则）共用
+ * 这一个真源。
  */
-export const MOBILE_BREAKPOINT = 768
+export const MOBILE_BREAKPOINT = 1023
 
 /**
- * 事件处理器里实时判断移动布局。useIsMobile 是渲染期求值（非响应式），
+ * 事件处理器里实时判断移动布局。useIsMobile 是响应式 hook（组件渲染期），
  * 点击/键盘事件里用实时值更准确，也不依赖组件是否订阅了 resize。
  */
 export const isMobileViewport = () => window.innerWidth <= MOBILE_BREAKPOINT

@@ -427,7 +427,7 @@ const Search = () => {
           ) : (
             <Virtuoso
               className='no-scrollbar'
-              style={{ height: 'calc(100vh - 260px)' }}
+              style={{ height: 'calc(100dvh - 260px)' }}
               components={trackListComponents}
               context={virtuosoContext}
               data={trackRows}

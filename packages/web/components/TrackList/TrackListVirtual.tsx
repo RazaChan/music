@@ -156,7 +156,7 @@ function TrackList({
       <Virtuoso
         className=' no-scrollbar'
         style={{
-          height: 'calc(100vh - 132px)',
+          height: 'calc(100dvh - 132px)',
         }}
         data={tracks}
         components={components}
