@@ -26,7 +26,12 @@
     "showDeskttopLyrics": "Show Deskttop Lyrics",
     "showDevices": "Show Audio Devices",
     "hide-show-player": "Hide/Show Player",
-    "close-window": "Close Window"
+    "close-window": "Close Window",
+    "loading": "Loading…",
+    "empty": "Nothing here yet",
+    "error": "Failed to load",
+    "retry": "Retry",
+    "please-login-hint": "Log in to see your music"
   },
   "navigation": {
     "goBack": "Go back",
@@ -104,7 +109,6 @@
       "title": "Lab",
       "description": "There are some experimental functions"
     },
-    "unlock": "Unlock More Music Source",
     "engine": "Engine",
     "player": "Player",
     "title-language": "Language",

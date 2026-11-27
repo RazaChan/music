@@ -200,3 +200,15 @@ export const isPWA = () =>
 export const isIosPwa = isIOS && isPWA() && isSafari
 
 export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * 移动布局断点（px）。useIsMobile 与曲目激活规则共用这一个真源，
+ * 改断点时两边行为保持一致。
+ */
+export const MOBILE_BREAKPOINT = 768
+
+/**
+ * 事件处理器里实时判断移动布局。useIsMobile 是渲染期求值（非响应式），
+ * 点击/键盘事件里用实时值更准确，也不依赖组件是否订阅了 resize。
+ */
+export const isMobileViewport = () => window.innerWidth <= MOBILE_BREAKPOINT

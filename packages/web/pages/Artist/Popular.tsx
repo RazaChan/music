@@ -1,6 +1,7 @@
 import { resizeImage } from '@/web/utils/common'
 import player from '@/web/states/player'
 import { State as PlayerState } from '@/web/utils/player'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
 import useTracks from '@/web/api/hooks/useTracks'
 import { css, cx } from '@emotion/css'
 import Image from '@/web/components/Image'
@@ -21,10 +22,13 @@ const Track = ({
 }) => {
   return (
     <div
-      className='flex items-center justify-between'
-      onClick={e => {
-        if (e.detail === 2 && track?.id) onPlay(track.id)
-      }}
+      className={cx(
+        'flex items-center justify-between',
+        'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5'
+      )}
+      tabIndex={0}
+      onClick={(e: TrackRowEvent) => track?.id && handleTrackRowEvent(e, track.id, { onPlay })}
+      onKeyDown={(e: TrackRowEvent) => track?.id && handleTrackRowEvent(e, track.id, { onPlay })}
     >
       {/* Cover */}
       <Image

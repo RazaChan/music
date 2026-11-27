@@ -32,7 +32,9 @@ const Info = ({
       {/* Title */}
       {isLoading ? (
         <div className='mt-2.5  text-28 font-semibold lg:mt-0 lg:text-36 lg:font-medium'>
-          <span className='rounded-full'>PLACEHOLDER</span>
+          <span className='inline-block h-[0.9em] w-56 animate-pulse select-none rounded-full bg-black/10 align-middle text-transparent dark:bg-white/10'>
+            .
+          </span>
         </div>
       ) : (
         <div className='mt-2.5 text-28 font-semibold transition-colors duration-300  lg:mt-0 lg:text-36 lg:font-medium'>
@@ -43,8 +45,8 @@ const Info = ({
       {/* Creator */}
       {isLoading ? (
         <div className='mt-2.5 lg:mt-6'>
-          <span className='text-24 font-medium'>
-            <span className='rounded-full'>PLACEHOLDER</span>
+          <span className='inline-block h-[0.9em] w-32 animate-pulse select-none rounded-full bg-black/10 align-middle text-24 font-medium text-transparent dark:bg-white/10'>
+            .
           </span>
         </div>
       ) : (
@@ -61,7 +63,9 @@ const Info = ({
       {/* Extra info */}
       {isLoading ? (
         <div className='mt-1 flex items-center text-12 font-medium lg:text-14 lg:font-bold'>
-          <span className='rounded-full'>PLACEHOLDER</span>
+          <span className='inline-block h-[0.9em] w-40 animate-pulse select-none rounded-full bg-black/10 align-middle text-transparent dark:bg-white/10'>
+            .
+          </span>
         </div>
       ) : (
         <div className='mt-1 flex items-center text-12 font-medium transition-colors duration-300 lg:text-14 lg:font-bold'>

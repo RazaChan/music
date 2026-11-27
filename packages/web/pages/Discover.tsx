@@ -1,5 +1,6 @@
 import CoverWall from '@/web/components/CoverWall'
 import PageTransition from '@/web/components/PageTransition'
+import { AsyncEmpty, AsyncError, AsyncLoading } from '@/web/components/AsyncState'
 import { fetchPlaylistWithReactQuery, fetchFromCache } from '@/web/api/hooks/usePlaylist'
 import { fetchTracksWithReactQuery } from '@/web/api/hooks/useTracks'
 import { sampleSize } from 'lodash-es'
@@ -69,7 +70,7 @@ const getAlbumsFromAPI = async () => {
 }
 
 const Discover = () => {
-  const { data: albums } = useQuery({
+  const { data: albums, isPending, isError, refetch } = useQuery({
     queryKey: ['DiscoveryAlbums'],
     queryFn: async () => {
       const albumsInLocalStorageTime = localStorage.getItem('discoverAlbumsTime')
@@ -90,7 +91,15 @@ const Discover = () => {
   return (
     <PageTransition disableEnterAnimation={true}>
       <div className='mx-2.5 mt-2.5 pb-10 lg:mx-0 lg:mt-0 lg:pb-16'>
-        <CoverWall albums={albums || []} />
+        {isPending ? (
+          <AsyncLoading className='min-h-[50vh]' />
+        ) : isError ? (
+          <AsyncError onRetry={() => refetch()} className='min-h-[50vh]' />
+        ) : !albums?.length ? (
+          <AsyncEmpty className='min-h-[50vh]' />
+        ) : (
+          <CoverWall albums={albums} />
+        )}
       </div>
     </PageTransition>
   )

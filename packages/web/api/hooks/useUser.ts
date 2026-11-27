@@ -4,7 +4,8 @@ import { CacheAPIs } from '@/shared/CacheAPIs'
 import { IpcChannels } from '@/shared/IpcChannels'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { logout as logoutAPI, refreshCookie } from '../auth'
-import { removeAllCookies, setCookies } from '@/web/utils/cookie'
+import { setCookies } from '@/web/utils/cookie'
+import { teardownLocalSession } from '@/web/utils/session'
 import reactQueryClient from '@/web/utils/reactQueryClient'
 
 export default function useUser() {
@@ -72,8 +73,8 @@ export const useIsLoggedIn = () => {
 
 export const logout = async () => {
   await logoutAPI()
-  removeAllCookies()
-  await window.ipcRenderer?.invoke(IpcChannels.Logout)
+  // 本地清理：Cookie + 全部 React Query 缓存 + 桌面端账号（与 301 路径共用）
+  await teardownLocalSession()
   await reactQueryClient.refetchQueries({ queryKey: [UserApiNames.FetchUserAccount] })
 }
 

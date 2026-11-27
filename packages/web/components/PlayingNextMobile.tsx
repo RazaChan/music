@@ -19,6 +19,7 @@ const PlayingNextMobile = () => {
     <AnimatePresence>
       {display && (
         <motion.div
+          data-testid='mobile-playing-next'
           className='fixed inset-0 bg-black/80 backdrop-blur-3xl'
           exit={{
             y: '100%',

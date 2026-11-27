@@ -1,6 +1,7 @@
 import Icon from '@/web/components/Icon'
 import Wave from '@/web/components/Animation/Wave'
 import { formatDuration, resizeImage } from '@/web/utils/common'
+import { TrackRowEvent } from '@/web/utils/trackActivation'
 import { State as PlayerState } from '@/web/utils/player'
 import { css, cx } from '@emotion/css'
 import { Fragment, memo, useEffect } from 'react'
@@ -21,19 +22,22 @@ const Track = memo(({
     index: number
     playingTrackID: number
     state: PlayerState
-    handleClick: (e: React.MouseEvent<HTMLElement>, trackID: number) => void
+    handleClick: (e: TrackRowEvent, trackID: number) => void
   }) => {
     const { showDownloadActions } = useSnapshot(settings)
     return (
       <div
         className={cx(
           'group p-1 mb-3 grid duration-300 hover:bg-black/5 dark:hover:bg-white/5 rounded-12',
+          'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5',
           css`
             grid-template-columns: 3fr 2fr 1fr;
           `
         )}
+        tabIndex={0}
         onClick={e => track && handleClick(e, track.id)}
         onContextMenu={e => track && handleClick(e, track.id)}
+        onKeyDown={e => track && handleClick(e, track.id)}
       >
         {/* Right part */}
         <div className='flex items-center'>

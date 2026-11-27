@@ -10,7 +10,8 @@ import { useWindowSize } from 'react-use'
 import { playerWidth, topbarHeight } from '@/web/utils/const'
 import useIsMobile from '@/web/hooks/useIsMobile'
 import { Virtuoso } from 'react-virtuoso'
-import { openContextMenu } from '@/web/states/contextMenus'
+import { openTrackContextMenu, shouldActivateTrackRow } from '@/web/utils/trackActivation'
+import { isMobileViewport } from '@/web/utils/common'
 import { useTranslation } from 'react-i18next'
 import useHoverLightSpot from '../hooks/useHoverLightSpot'
 import { motion } from 'framer-motion'
@@ -135,20 +136,21 @@ const Header = () => {
 // <Track/> rows don't re-render just because their parent did. We read
 // the track id straight off the DOM via data-attr instead of capturing
 // it in a closure.
+// 统一激活规则：移动单击（含移动队列抽屉）/ 桌面双击 / 键盘 Enter
 const onTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-  if (e.detail !== 2) return
+  if (!shouldActivateTrackRow(e, isMobileViewport())) return
+  const id = Number(e.currentTarget.dataset.trackId)
+  if (id) player.playTrack(id)
+}
+const onTrackKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  if (!shouldActivateTrackRow(e, isMobileViewport())) return
   const id = Number(e.currentTarget.dataset.trackId)
   if (id) player.playTrack(id)
 }
 const onTrackContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
   const id = Number(event.currentTarget.dataset.trackId)
   if (!id) return
-  openContextMenu({
-    event,
-    type: 'track',
-    dataSourceID: id,
-    options: { useCursorPosition: true },
-  })
+  openTrackContextMenu(event, id)
 }
 
 const Track = memo(
@@ -168,10 +170,15 @@ const Track = memo(
   }) => {
     return (
       <div
-        className={cx('mb-5 flex items-center justify-between')}
+        className={cx(
+          'mb-5 flex items-center justify-between',
+          'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5'
+        )}
+        tabIndex={0}
         data-track-id={track?.id ?? ''}
         onClick={onTrackClick}
         onContextMenu={onTrackContextMenu}
+        onKeyDown={onTrackKeyDown}
       >
         {/* Cover */}
         <img

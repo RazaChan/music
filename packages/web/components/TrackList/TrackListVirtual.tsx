@@ -1,8 +1,8 @@
 import Icon from '@/web/components/Icon'
 import Wave from '@/web/components/Animation/Wave'
-import { openContextMenu } from '@/web/states/contextMenus'
 import player from '@/web/states/player'
 import { formatDuration, resizeImage } from '@/web/utils/common'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
 import { State as PlayerState } from '@/web/utils/player'
 import { css, cx } from '@emotion/css'
 import { Fragment, memo, useCallback, useMemo } from 'react'
@@ -26,19 +26,22 @@ const Track = memo(({
   index: number
   isPlaying: boolean
   state: PlayerState
-  onClick: (e: React.MouseEvent<HTMLElement>, trackID: number) => void
+  onClick: (e: TrackRowEvent, trackID: number) => void
 }) => {
   const { showDownloadActions } = useSnapshot(settings)
   return (
     <div
       className={cx(
         'group p-1 mb-3 grid duration-300 hover:bg-black/5 dark:hover:bg-white/5 rounded-12',
+        'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5',
         css`
           grid-template-columns: 3fr 2fr 1fr;
         `
       )}
+      tabIndex={0}
       onClick={e => track && onClick(e, track.id)}
       onContextMenu={e => track && onClick(e, track.id)}
+      onKeyDown={e => track && onClick(e, track.id)}
     >
       {/* Right part */}
       <div className='flex items-center'>
@@ -137,23 +140,9 @@ function TrackList({
   // here is critical: without it, this list re-renders ~12×/s during playback.
   const { trackID, state } = useSnapshot(player)
 
+  // 统一激活规则：移动单击 / 桌面双击 / 键盘 Enter（utils/trackActivation.ts）
   const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLElement>, id: number) => {
-      if (isLoading) return
-      if (e.type === 'contextmenu') {
-        e.preventDefault()
-        openContextMenu({
-          event: e,
-          type: 'track',
-          dataSourceID: id,
-          options: {
-            useCursorPosition: true,
-          },
-        })
-        return
-      }
-      if (e.detail === 2) onPlay?.(id)
-    },
+    (e: TrackRowEvent, id: number) => handleTrackRowEvent(e, id, { onPlay, isLoading }),
     [isLoading, onPlay]
   )
 

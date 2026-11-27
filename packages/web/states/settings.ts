@@ -26,7 +26,6 @@ interface Settings {
   displayPlaylistsFromNeteaseMusic: boolean
   closeWindowInMinimize: boolean
   showBackgroundImage: boolean
-  unlock: boolean
   theme: string
   showDesktopLyrics: boolean
   keyboardShortcuts: KeyboardShortcutSettings
@@ -68,7 +67,6 @@ const initSettings: Settings = {
     port: 0,
     protocol: 'http',
   },
-  unlock: true,
   theme: 'dark',
   showDesktopLyrics: false,
   keyboardShortcuts: getKeyboardShortcutDefaultSettings(),

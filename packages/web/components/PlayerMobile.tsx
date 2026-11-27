@@ -74,9 +74,11 @@ const PlayerMobile = ({
         `
       )}
     >
-      {/* Handler */}
-      {mobileShowPlayingNext && (
+      {/* Handler — 点击打开播放队列。此前渲染条件写反（只在队列已打开时
+          渲染、点击仍是设为 true），移动端队列因此永远无法打开。 */}
+      {!mobileShowPlayingNext && (
         <motion.div
+          data-testid='mobile-queue-handle'
           onClick={() => {
             uiStates.mobileShowPlayingNext = true
           }}

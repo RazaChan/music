@@ -1,5 +1,4 @@
 export const getKeyboardShortcutDefaultSettings = (): KeyboardShortcutSettings => ({
-  localEnabled: true,
   globalEnabled: false,
   darwin: {
     playPause: [['Space'], ['Cmd', 'KeyP']],

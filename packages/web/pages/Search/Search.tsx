@@ -1,5 +1,7 @@
 import player from '@/web/states/player'
 import { resizeImage } from '@/web/utils/common'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
+import { AsyncError } from '@/web/components/AsyncState'
 import dayjs from 'dayjs'
 import { useMemo, useCallback, useState, useRef, memo } from 'react'
 import toast from 'react-hot-toast'
@@ -92,10 +94,13 @@ const TrackItem = memo(
     return (
       <div
         title={hint}
-        className='flex cursor-pointer items-center justify-between'
-        onClick={e => {
-          if (e.detail === 2 && track?.id) onPlay(track.id)
-        }}
+        className={cx(
+          'flex cursor-pointer items-center justify-between',
+          'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5'
+        )}
+        tabIndex={0}
+        onClick={(e: TrackRowEvent) => track?.id && handleTrackRowEvent(e, track.id, { onPlay })}
+        onKeyDown={(e: TrackRowEvent) => track?.id && handleTrackRowEvent(e, track.id, { onPlay })}
       >
         <Image
           className='mr-4 aspect-square h-14 w-14 shrink-0 rounded-12'
@@ -119,20 +124,7 @@ TrackItem.displayName = 'SearchTrackItem'
 
 const SectionError = ({ onRetry }: { onRetry: () => void }) => {
   const { t } = useTranslation()
-  return (
-    <div className='flex flex-col items-center justify-center gap-3 py-10'>
-      <div className='text-14 font-bold text-neutral-700 dark:text-neutral-300'>
-        {t`search.error`}
-      </div>
-      <button
-        onClick={onRetry}
-        className='flex items-center gap-1.5 rounded-full bg-black/10 px-4 py-1.5 text-14 font-bold text-neutral-800 hover:bg-black/20 dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-white/20'
-      >
-        <Icon name='refresh' className='h-4 w-4' />
-        {t`search.retry`}
-      </button>
-    </div>
-  )
+  return <AsyncError onRetry={onRetry} text={t`search.error`} />
 }
 
 const SectionHeader = ({

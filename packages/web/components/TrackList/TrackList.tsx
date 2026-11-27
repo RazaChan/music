@@ -4,7 +4,7 @@ import player from '@/web/states/player'
 import { useSnapshot } from 'valtio'
 import Wave from '../Animation/Wave'
 import Icon from '@/web/components/Icon'
-import useIsMobile from '@/web/hooks/useIsMobile'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
 import useUserLikedTracksIDs, { useMutationLikeATrack } from '@/web/api/hooks/useUserLikedTracksIDs'
 import toast from 'react-hot-toast'
 import { memo, useEffect, useMemo, useState } from 'react'
@@ -137,18 +137,21 @@ const Track  = memo(({
   handleClick,
 }: {
   track: Track
-  handleClick: (e: React.MouseEvent<HTMLElement>, trackID: number) => void
+  handleClick: (e: TrackRowEvent, trackID: number) => void
 })=> {
   const { track: playingTrack, state } = useSnapshot(player)
 
   return (
     <div
       key={track.id}
+      tabIndex={0}
       onClick={e => handleClick(e, track.id)}
       onContextMenu={e => handleClick(e, track.id)}
+      onKeyDown={e => handleClick(e, track.id)}
       className={cx(
         'group relative flex h-14 items-center py-2 text-16 font-medium transition duration-300',
-        'text-black/90 dark:text-white/90'
+        'text-black/90 dark:text-white/90',
+        'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5'
       )}
     >
       {/* Track no */}
@@ -217,29 +220,9 @@ const TrackList = ({
   isLoading?: boolean
   placeholderRows?: number
 }) => {
-  const isMobile = useIsMobile()
-
-  const handleClick = (e: React.MouseEvent<HTMLElement>, trackID: number) => {
-    if (isLoading) return
-    if (e.type === 'contextmenu') {
-      e.preventDefault()
-      openContextMenu({
-        event: e,
-        type: 'track',
-        dataSourceID: trackID,
-        options: {
-          useCursorPosition: true,
-        },
-      })
-      return
-    }
-
-    if (isMobile) {
-      onPlay?.(trackID)
-    } else {
-      if (e.detail === 2) onPlay?.(trackID)
-    }
-  }
+  // 统一激活规则：移动单击 / 桌面双击 / 键盘 Enter（utils/trackActivation.ts）
+  const handleClick = (e: TrackRowEvent, trackID: number) =>
+    handleTrackRowEvent(e, trackID, { onPlay, isLoading })
 
   return (
     <div className={cx(className)}>
@@ -257,14 +240,18 @@ const TrackList = ({
           {/* Track no */}
           <div className='mr-3 rounded-full  lg:mr-6'>00</div>
 
-          {/* Track name */}
+          {/* Track name — 骨架条，不再显示可见的 PLACEHOLDER 文本 */}
           <div className='flex grow items-center'>
-            <span className='mr-4 rounded-full '>PLACEHOLDER1234567</span>
+            <span className='mr-4 inline-block h-4 w-48 animate-pulse select-none rounded-full bg-black/10 text-transparent dark:bg-white/10'>
+              .
+            </span>
           </div>
 
           {/* Track duration */}
           <div className='hidden text-right lg:block'>
-            <span className='rounded-full '>00:00</span>
+            <span className='inline-block h-4 w-12 animate-pulse select-none rounded-full bg-black/10 text-transparent dark:bg-white/10'>
+              .
+            </span>
           </div>
         </div>
       ))}

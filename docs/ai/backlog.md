@@ -278,3 +278,74 @@ MCP 浏览器桥不可用，改用**零依赖方案**：headless Edge + Node 内
 - 账号切换 / 登出的 React Query 缓存清理（`useUser.ts` logout 只 refetch 账号 query）
 - 301 未登录的 logout 接线（`request.ts:37` 被注释）
 - 无效设置清理（`unlock`、`keyboardShortcuts.localEnabled`）
+
+## 11. 阶段 1 第二批落地记录（2026-11-27）
+
+路线文档阶段 1 剩余 P0：移动队列入口、曲目激活规则统一、会话清理、301 接线、无效设置清理。
+
+### 交付内容
+
+**移动队列断链修复**：`PlayerMobile.tsx` 把手渲染条件写反（只在队列已打开时渲染、点击仍是设为 true），改为 `!mobileShowPlayingNext` 时渲染 + 点击打开；`PlayingNextMobile` 加 `data-testid` 供验证。
+
+**曲目激活规则统一**（新增 `web/utils/trackActivation.ts`）：
+
+- 规则（产品决策）：触屏/移动布局单击播放；桌面双击播放；键盘 Enter 播放；右键统一菜单
+- 应用到全部 8 处曲目行：`TrackList`、`TrackListVirtual`、`Track`（My 三页共用行）、`PlayingNext`（含移动抽屉）、`Daily`、`Recent`、`Cloud`、`ArtistSongs`、`Popular`、`Search`
+- 行元素补 `tabIndex` + `onKeyDown` + `focus-visible` 底色；`PlayingNext` 右键补上了缺失的 `preventDefault`
+- 断点 768 收敛为单一真源：`common.ts` 的 `MOBILE_BREAKPOINT` / `isMobileViewport()`，`useIsMobile` 与激活规则共用
+
+**会话清理**（新增 `web/utils/session.ts`）：
+
+- `teardownLocalSession()`：清 Cookie + 结算感知地清空 React Query 缓存 + 桌面端账号，3s 节流防并发 301 风暴
+- `useUser.logout` 改走该模块（原来只 refetch 账号 query，用户数据缓存全残留）
+- `request.ts` 的 301 拦截器接线（原 logout 被注释）：**异步延迟**执行，避免在查询自己的 rejection 链里清理自己
+
+**无效设置清理**：删除 `settings.unlock`（含 i18n 两个 key）与 `keyboardShortcuts.localEnabled`（interface.d.ts + defaultSettings）——两者均零消费方。
+
+### 冒烟抓到并已修复的实现陷阱（重要，勿回退）
+
+**React Query 缓存清理不能 cancel 进行中的查询**：`queryClient.clear()` / `cancelQueries()` 会让 in-flight 查询的 retryer promise 以 `CancelledError` 拒绝，且无人接管（读了 query-core 源码确认：`Query.cancel` 只给 `this.promise` 挂 catch，destroy 路径的 rejection 仍可能逃逸）→ 未处理的 rejection 刷屏。正确做法是 session.ts 里的**结算感知移除**：已结算的直接 `cache.remove()`，进行中的订阅 cache 事件等结算后移除。同理，301 拦截器里必须 `setTimeout` 延迟清理，否则会在查询自己的 rejection 链里清理自己。
+
+### 测试与验证
+
+- 单测：`7 文件 / 86 用例` → **`10 文件 / 96 用例` 全绿**（trackActivation 7、session 3）
+- CDP 冒烟（复用 `%TEMP%/smoke-player-restore.mjs`）：**20/20**，新增场景 3——移动视口（390px）下队列把手渲染、初始关闭、点击打开
+- `test:types` 0 error；lint 全部改动文件**零新增**（request.ts 3→2、useIsMobile 1→0 反而改善）
+- 注意：冒烟期间发现 `pnpm dev` 重启后需重新等 42710 起来再跑脚本
+
+## 12. 阶段 1 第三批落地记录（2026-11-27）—— 阶段 1 完成
+
+统一异步状态（加载 / 空 / 错误重试 / 未登录），阶段 1 最后一项。
+
+### 交付内容
+
+**新增 `web/components/AsyncState.tsx`**：`AsyncLoading` / `AsyncEmpty` / `AsyncError`（沉淀自 Search 页 SectionError 模式）/ `PleaseLogin`（按钮打开全局登录弹窗），均带 `data-testid`。i18n `common` 节新增 `loading/empty/error/retry/please-login-hint`，按钮复用 `auth.login`。
+
+**接线**：
+
+| 位置 | 原状 | 现状 |
+|---|---|---|
+| `My.tsx` | 未登录分支被注释，`PleaseLogin` 是空组件 | `useIsLoggedIn()` 为 false 时渲染真实登录引导；加载中仍渲染内容骨架（该 hook pending 时返回 true），避免登录用户看到引导闪烁 |
+| `Discover.tsx` | 无加载/空/错误态，失败时静默空墙 | isPending → AsyncLoading；isError → AsyncError+重试；空数组 → AsyncEmpty |
+| `TrackListHeader/Info.tsx` | 加载时**可见**的 "PLACEHOLDER" 文本 | 骨架条（animate-pulse + text-transparent，对齐 ArtistInfo 既有模式） |
+| `TrackList.tsx` 占位行 | 可见 "PLACEHOLDER1234567" | 骨架条 |
+| `Search.tsx` SectionError | 本地实现 | 改用共享 AsyncError（去重） |
+| `Login.tsx` | — | 弹窗加 `data-testid='login-modal'` |
+
+Artist 头部的占位原本就是隐形骨架（text-transparent），未动；VideoPlayer 的占位同理未动。
+
+### 验证
+
+- 单测 10 文件 / 96 用例全绿；`test:types` 0 error
+- CDP 冒烟 **24/24**：新增场景 4——未登录 My 页显示登录引导 + 登录弹窗自动打开（既有行为保持）；Discover 到达定义态（实测加载出 97 张封面）；全页无可见 PLACEHOLDER 文本
+- lint：改动文件零新增（My.tsx 3→0）
+- 冒烟脚本经验：hash 路由导航不触发 `Page.loadEventFired`，用导航 + 定时等待
+
+### 阶段 1 完成度对照（路线文档验收标准）
+
+- ✅ 重启恢复队列/曲目/进度/音量/随机状态（§10，冒烟 S1）
+- ✅ 音源失败有定义明确的反馈与回退，不无声卡死、不无限跳歌（§10，失败生命周期）
+- ✅ 各页面同一曲目操作符合统一交互契约（§11，移动单击/桌面双击/键盘 Enter）
+- ✅ 移动队列可打开、操作、关闭（§11，冒烟 S3）
+- ✅ 账号切换不泄漏上一账号 UI 数据（§11，结算感知缓存清理）
+- ✅ 统一未登录/加载/空/错误状态（本节，冒烟 S4）

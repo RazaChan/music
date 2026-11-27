@@ -266,7 +266,6 @@ declare interface KeyboardShortcuts {
 
 declare interface KeyboardShortcutSettings {
   globalEnabled: boolean
-  localEnabled: boolean
   darwin: KeyboardShortcuts
   win32: KeyboardShortcuts
   linux: KeyboardShortcuts

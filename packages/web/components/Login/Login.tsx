@@ -89,7 +89,10 @@ const Login = () => {
       {/* Content */}
       <AnimatePresence>
         {showLoginPanel && (
-          <div className='fixed inset-0 z-30 flex items-center justify-center pt-24 backdrop-blur-xl'>
+          <div
+            data-testid='login-modal'
+            className='fixed inset-0 z-30 flex items-center justify-center pt-24 backdrop-blur-xl'
+          >
             <motion.div
               className='flex flex-col items-center'
               variants={{

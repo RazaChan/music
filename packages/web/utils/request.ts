@@ -5,7 +5,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios'
-import { logout } from '../api/hooks/useUser'
+import { teardownLocalSession } from './session'
 
 // In dev, Vite proxies '/netease' to the local API server (see vite.config).
 // In production builds the env var may be missing; fall back to the same path
@@ -33,8 +33,13 @@ service.interceptors.response.use(
     const { response } = error
     const data = response?.data as any
     if (data?.code === 301 && data?.message === '未登录') {
-      console.log('未登录')
-      // logout()
+      // 会话已失效：做本地清理（节流，见 utils/session.ts）。
+      // 必须异步延迟执行 —— 同步执行会在当前查询自己的 rejection 链里
+      // cancel 它自己，产生未处理的 CancelledError（冒烟实测抓到）。
+      // 不能在这里调上游 /logout —— logout 接口自身也会 301，会循环。
+      setTimeout(() => {
+        teardownLocalSession()
+      }, 0)
     }
     return Promise.reject(error)
   }

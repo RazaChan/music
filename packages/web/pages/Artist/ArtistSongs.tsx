@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import Icon from '@/web/components/Icon'
 import Wave from '@/web/components/Animation/Wave'
 import Loading from '@/web/components/Animation/Loading'
-import { openContextMenu } from '@/web/states/contextMenus'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
 import player from '@/web/states/player'
 import settings from '@/web/states/settings'
 import { ease } from '@/web/utils/const'
@@ -44,22 +44,15 @@ const Row = memo(
       <div
         className={cx(
           'group p-1 mb-3 grid duration-300 hover:bg-black/5 dark:hover:bg-white/5 rounded-12',
+          'outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/5',
           css`
             grid-template-columns: 3fr 2fr 1fr;
           `
         )}
-        onClick={e => {
-          if (e.detail === 2) onPlay(track.id)
-        }}
-        onContextMenu={e => {
-          e.preventDefault()
-          openContextMenu({
-            event: e,
-            type: 'track',
-            dataSourceID: track.id,
-            options: { useCursorPosition: true },
-          })
-        }}
+        tabIndex={0}
+        onClick={(e: TrackRowEvent) => handleTrackRowEvent(e, track.id, { onPlay })}
+        onContextMenu={(e: TrackRowEvent) => handleTrackRowEvent(e, track.id, { onPlay })}
+        onKeyDown={(e: TrackRowEvent) => handleTrackRowEvent(e, track.id, { onPlay })}
       >
         <div className='flex items-center'>
           {/* Index / playing wave */}

@@ -16,7 +16,7 @@ import { Fragment, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import React from 'react'
 import { useSnapshot } from 'valtio'
-import { openContextMenu } from '@/web/states/contextMenus'
+import { handleTrackRowEvent, TrackRowEvent } from '@/web/utils/trackActivation'
 import { motion } from 'framer-motion'
 import { map } from 'lodash-es'
 import Track from '@/web/components/TrackList/Track'
@@ -46,23 +46,9 @@ const Daily = ({ className }: { className?: string }) => {
     player.playAList(songIDs, trackID)
   }
 
-  const handleClick = (e: React.MouseEvent<HTMLElement>, trackID: number) => {
-    if (isLoadingDaily) return
-    if (e.type === 'contextmenu') {
-      e.preventDefault()
-      openContextMenu({
-        event: e,
-        type: 'track',
-        dataSourceID: trackID,
-        options: {
-          useCursorPosition: true,
-        },
-      })
-      return
-    }
-
-    if (e.detail === 2) onPlay?.(trackID)
-  }
+  // 统一激活规则：移动单击 / 桌面双击 / 键盘 Enter（utils/trackActivation.ts）
+  const handleClick = (e: TrackRowEvent, trackID: number) =>
+    handleTrackRowEvent(e, trackID, { onPlay, isLoading: isLoadingDaily })
 
   return (
     <motion.div>
