@@ -556,3 +556,20 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 2. **headless 下 document 可能无焦点**：自动聚焦失效导致可信键盘事件无接收者——键盘断言前 `Page.bringToFront` + 显式 `focus()`
 3. **JS 合成 keydown 对 React 根监听器投递不可靠**：键盘事件用 CDP `Input.dispatchKeyEvent`（可信管道）；鼠标交互用 DOM `.click()` 依然可靠
 4. 重连时关闭全部旧 page target（遗留页面的 vite HMR 客户端持续耗渲染预算）
+
+## 21. 阶段 4 第二批落地记录（2026-11-27）—— Discover 可控化
+
+### 交付内容
+
+**方向筛选**：精选（原有人工歌单池，行为不变）+ 华语/欧美/日语/韩语/粤语/纯音乐六个方向——经 `/top/playlist?cat=` 动态取真实热门歌单，**不硬编码可能失效的歌单 ID**（精选池之外的分类零硬编码）。
+
+**换一批**：nonce 递增触发重新抽样；nonce>0 跳过 localStorage 缓存直取新数据；fetching 中按钮禁用 + 图标旋转。
+
+**播放全部**：抽样管线保留曲目 ID（`DiscoverData.trackIDs`，顺序即随机顺序），一键 `playAList` 整组播放。
+
+**缓存兼容**：仅默认方向首次加载走旧的 2 小时 localStorage 节奏；旧裸数组缓存格式经 `normalizeCached` 兼容；方向/换一批的数据不落 localStorage（React Query staleTime 内存缓存）。
+
+### 验证
+
+- 单测 119 全绿；`test:types` 0 error；lint 零新增
+- CDP 冒烟 **49/49**：新增场景 11——页头渲染（7 方向 + 换一批 + 播放）、切"华语"经真实 top/playlist 到达定义态、换一批后仍定义态

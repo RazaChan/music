@@ -215,5 +215,16 @@
     "show-in-folder": "Show in folder",
     "open-folder": "Open downloads folder",
     "clear-finished": "Clear finished"
+  },
+  "discover": {
+    "direction-featured": "Featured",
+    "direction-chinese": "Chinese",
+    "direction-western": "Western",
+    "direction-japanese": "Japanese",
+    "direction-korean": "Korean",
+    "direction-cantonese": "Cantonese",
+    "direction-instrumental": "Instrumental",
+    "refresh": "Shuffle",
+    "play-all": "Play"
   }
 }
