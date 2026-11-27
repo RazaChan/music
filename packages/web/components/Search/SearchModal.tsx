@@ -62,14 +62,20 @@ const SearchModal = () => {
   }, [platform])
 
   // Auto-focus + select-all on open: keep the previous query but select it
-  // so retyping replaces it (Spotlight behavior).
+  // so retyping replaces it (Spotlight behavior). 关闭时把焦点还给打开前的
+  // 元素（dialog 可访问性：焦点不丢进 body）。
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (showSearchModal) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null
       // Wait a tick for the input to mount before focusing.
       window.setTimeout(() => {
         inputRef.current?.focus()
         inputRef.current?.select()
       }, 0)
+    } else {
+      restoreFocusRef.current?.focus?.()
+      restoreFocusRef.current = null
     }
   }, [showSearchModal])
 
@@ -115,6 +121,9 @@ const SearchModal = () => {
         {showSearchModal && (
           <div className='pointer-events-none fixed inset-0 z-30 flex items-start justify-center pt-[10vh]'>
             <motion.div
+              role='dialog'
+              aria-modal='true'
+              aria-label='Search'
               className={cx(
                 'app-region-no-drag pointer-events-auto flex flex-col rounded-24 shadow-2xl',
                 'border border-black/10 bg-white/95 dark:border-white/10 dark:bg-black/95',

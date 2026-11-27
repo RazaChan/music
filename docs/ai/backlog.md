@@ -501,3 +501,36 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 
 - 单测 109 全绿；`test:types` 0 error；lint 零新增（TrackListVirtual 1→0）
 - CDP 冒烟 **39/39** 回归通过
+
+## 19. 阶段 3 第四批落地记录（2026-11-27）—— 可访问性（阶段 3 完成）
+
+### 交付内容
+
+**恢复用户缩放**：`index.html` viewport 移除 `user-scalable=no / maximum-scale=1`。
+
+**减少动效（prefers-reduced-motion）**：
+- App 根部 `MotionConfig reducedMotion="user"`——framer-motion 的位移/缩放动画全局降级为透明度过渡
+- `global.css` 媒体查询压制 CSS 动画/过渡时长与平滑滚动
+- `BreathingBackground` 在减少动效下不订阅音量驱动（`--vol` 恒 0，停留在静态安静层）
+
+**控件语义与键盘**：
+- `Slider`：`role="slider"` + `tabIndex` + `aria-value*`/`aria-orientation`/`aria-label` + 方向键/Home/End（纯函数 `nextSliderValue` 抽出并配 4 个单测，步长默认量程 1/20）
+- 设置 `Switch`：div → `motion.button role="switch" aria-checked`
+- `Tabs`：`tablist/tab` + `aria-selected` + roving tabindex + 左右方向键移动
+- `SearchModal`：`role="dialog" aria-modal` + 关闭时焦点还原到打开前的元素
+
+**焦点环**：`global.css` 新增全局 `:focus-visible` 强调色环（保留 `outline-hidden` 使鼠标点击不出环）。
+
+### 验证
+
+- 单测 **12 文件 / 113 用例**全绿（+sliderKeyboard 4）；`test:types` 0 error；lint 零新增
+- CDP 冒烟 **43/43**：新增场景 9——viewport 无 user-scalable=no、播放器 slider 带 role 与 aria-valuenow、Switch 点击翻转 aria-checked、搜索弹窗 role=dialog 且 Escape 可关
+
+### 冒烟基建的重要排障记录（后续写长套件必读）
+
+套件拉长后出现"隔离复现全过、套件内假失败"，逐层定位到三个渲染器退化源：
+1. **headless 窗口被视为遮挡 → 渲染器后台化**（rAF/定时器节流，framer-motion 退出动画永不完成）→ 启动参数加 `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling`
+2. **长生命周期渲染器的 matchMedia change 事件投递退化**（matches 值正确但事件不派发）→ 套件中段重启浏览器（脚本已内置 S6 前重连）
+3. **hash 导航的文档上下文里合成 keydown 投递退化** → 键盘类断言用独立整页加载的文档
+
+ Escape/焦点类功能本身经 4 种隔离路径验证正常，非应用 bug。

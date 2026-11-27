@@ -398,6 +398,12 @@
     @apply outline-hidden;
   }
 
+  /* 键盘导航的可见焦点环（鼠标点击不受影响） */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--brand-color-500));
+    outline-offset: 2px;
+  }
+
   *::selection {
     @apply bg-brand-500 text-neutral-800;
   }
@@ -873,4 +879,17 @@ input[type='number']::-webkit-outer-spin-button {
 
 .dark .top-bar-frost {
   background-color: rgba(0, 0, 0, 0.32);
+}
+
+/* 尊重系统的减少动效偏好：保留状态可理解性（透明度变化瞬时完成），
+   去掉位移/回弹/循环动画与平滑滚动 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

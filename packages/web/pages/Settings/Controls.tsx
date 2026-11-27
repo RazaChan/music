@@ -10,7 +10,10 @@ export function Switch({
   onChange: (enabled: boolean) => void
 }) {
   return (
-    <motion.div
+    <motion.button
+      type='button'
+      role='switch'
+      aria-checked={enabled}
       className={cx(
         'flex w-11 items-center justify-start rounded-full p-1 transition-colors duration-500',
         enabled ? 'bg-brand-700' : 'bg-black/30 dark:bg-white/30'
@@ -21,7 +24,7 @@ export function Switch({
         animate={{ x: enabled ? 16 : 0 }}
         className='h-5 w-5 rounded-full shadow-sm bg-white dark:bg-gray-800'
       ></motion.div>
-    </motion.div>
+    </motion.button>
   )
 }
 

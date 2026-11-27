@@ -23,10 +23,24 @@ function Tabs<T>({
     <div
       className={cx('no-scrollbar flex flex-wrap gap-4 overflow-y-auto', className)}
       style={style}
+      role='tablist'
     >
-      {tabs.map(tab => (
+      {tabs.map((tab, index) => (
         <div
           key={tab.id as string}
+          role='tab'
+          aria-selected={value === tab.id}
+          // roving tabindex：仅选中项在 Tab 序中，左右方向键在标签间移动
+          tabIndex={value === tab.id ? 0 : -1}
+          onKeyDown={e => {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+            e.preventDefault()
+            const offset = e.key === 'ArrowRight' ? 1 : -1
+            const nextIndex = (index + offset + tabs.length) % tabs.length
+            onChange(tabs[nextIndex].id)
+            const parent = e.currentTarget.parentElement
+            ;(parent?.children[nextIndex] as HTMLElement | undefined)?.focus?.()
+          }}
           className={cx(
             // No backdrop-blur: these chips sit above the virtualized
             // grid, and a backdrop-filter re-filtered the scrolling

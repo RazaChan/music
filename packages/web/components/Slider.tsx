@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { cx } from '@emotion/css'
+import { nextSliderValue } from '@/web/utils/sliderKeyboard'
 
 const Slider = ({
   value,
@@ -9,6 +10,8 @@ const Slider = ({
   onlyCallOnChangeAfterDragEnded = false,
   orientation = 'horizontal',
   alwaysShowThumb = false,
+  step,
+  'aria-label': ariaLabel,
 }: {
   value: number
   min: number
@@ -18,6 +21,9 @@ const Slider = ({
   orientation?: 'horizontal' | 'vertical'
   alwaysShowTrack?: boolean
   alwaysShowThumb?: boolean
+  /** 键盘步长，默认量程的 1/20 */
+  step?: number
+  'aria-label'?: string
 }) => {
   const sliderRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -106,6 +112,20 @@ const Slider = ({
     return orientation === 'horizontal' ? { left: percentage } : { bottom: percentage }
   }, [max, memoedValue, orientation])
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const next = nextSliderValue(e.key, value, {
+        min,
+        max,
+        step: step ?? (max - min) / 20,
+      })
+      if (next === null) return
+      e.preventDefault()
+      onChange(next)
+    },
+    [value, min, max, step, onChange]
+  )
+
   return (
     <div
       className={cx(
@@ -115,6 +135,14 @@ const Slider = ({
       )}
       ref={sliderRef}
       onClick={handleClick}
+      role='slider'
+      tabIndex={0}
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(memoedValue * 100) / 100}
+      aria-orientation={orientation}
+      onKeyDown={handleKeyDown}
     >
       {/* Track */}
       <div

@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import { useMedia } from 'react-use'
 import { useSnapshot } from 'valtio'
 import player from '@/web/states/player'
 import settings, { isLowPowerDevice } from '@/web/states/settings'
@@ -28,6 +29,8 @@ const BreathingBackground = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null)
   const lastVolRef = useRef<string | null>(null)
   const lowPower = autoLowPowerMode && isLowPowerDevice()
+  // 减少动效偏好：不订阅音量驱动（--vol 恒为 0，画面停留在静态的安静层）
+  const prefersReducedMotion = useMedia('(prefers-reduced-motion: reduce)', false)
 
   // Preload-then-swap: swapping `background-image` to an undecoded URL
   // drops the old paint immediately — on a transparent window the gap
@@ -53,7 +56,7 @@ const BreathingBackground = memo(() => {
   }, [coverUrl])
 
   useEffect(() => {
-    if (!enableBreathingEffect) return
+    if (!enableBreathingEffect || prefersReducedMotion) return
     const root = rootRef.current
     if (!root) return
     lastVolRef.current = null
@@ -66,7 +69,7 @@ const BreathingBackground = memo(() => {
       lastVolRef.current = value
       root.style.setProperty('--vol', value)
     })
-  }, [enableBreathingEffect])
+  }, [enableBreathingEffect, prefersReducedMotion])
 
   if (!enableBreathingEffect) return null
 
