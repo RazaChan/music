@@ -1,8 +1,9 @@
-import { BrowserWindow, ipcMain, app, BrowserWindowConstructorOptions, App } from 'electron'
+import { BrowserWindow, ipcMain, app, shell, BrowserWindowConstructorOptions, App } from 'electron'
 import { join } from 'path'
 import store from './store'
 import { IpcChannels, IpcChannelsParams } from '@/shared/IpcChannels'
 import cache from './cache'
+import { cancelAudioDownload, downloadAudioToDisk, getDownloadsDir } from './downloader'
 import log from './log'
 import Store from 'electron-store'
 import { TypedElectronStore } from './store'
@@ -319,6 +320,27 @@ function initOtherIpcMain(win: BrowserWindow | null) {
     }
     db.truncate(Tables.Audio)
     db.vacuum()
+  })
+
+  /**
+   * 显式下载：主进程流式下载到 userData/downloads，进度经 AudioDownloadProgress 推送
+   */
+  handle(IpcChannels.DownloadAudioToDisk, (e, params) => {
+    return downloadAudioToDisk(win, params)
+  })
+
+  handle(IpcChannels.CancelAudioDownload, (e, { id }) => {
+    cancelAudioDownload(id)
+  })
+
+  handle(IpcChannels.ShowItemInFolder, (e, { path: targetPath }) => {
+    shell.showItemInFolder(targetPath)
+  })
+
+  handle(IpcChannels.OpenDownloadsFolder, async () => {
+    const dir = getDownloadsDir()
+    await fs.promises.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
   })
 
   /**

@@ -2,6 +2,7 @@ import { css, cx } from '@emotion/css'
 import Avatar from './Avatar'
 import SearchBox from './SearchBox'
 import SettingsButton from './SettingsButton'
+import DownloadsButton from './DownloadsButton'
 import NavigationButtons from './NavigationButtons'
 import uiStates from '@/web/states/uiStates'
 import { useSnapshot } from 'valtio'
@@ -103,6 +104,7 @@ const TopbarDesktop = () => {
       {/* Right Part */}
       <div className='z-10 flex gap-2'>
         <Theme />
+        <DownloadsButton />
         <SettingsButton />
         <Avatar className='ml-3 h-12 w-12' />
       </div>

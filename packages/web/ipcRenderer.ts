@@ -4,6 +4,7 @@ import uiStates from './states/uiStates'
 import settings from './states/settings'
 import toast from 'react-hot-toast'
 import { changeAccentColor, changeTheme } from './utils/theme'
+import { updateDownloadProgress } from './states/downloads'
 import { RepeatMode } from '@/shared/playerDataTypes'
 
 const on = <T extends keyof IpcChannelsParams & keyof IpcChannelsReturns>(
@@ -71,5 +72,10 @@ export function ipcRenderer() {
 
   on(IpcChannels.VolumeDown, () => {
     player.volume -= 0.1
+  })
+
+  // 主进程下载器的进度推送
+  on(IpcChannels.AudioDownloadProgress, (e, { id, loaded, total }) => {
+    updateDownloadProgress(id, loaded, total)
   })
 }

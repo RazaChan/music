@@ -196,5 +196,18 @@
   "coverrow": {
     "songs": "Songs",
     "plays": "Plays"
+  },
+  "downloads": {
+    "title": "Downloads",
+    "empty": "No downloads yet",
+    "downloading": "Downloading",
+    "failed": "Download failed",
+    "cancelled": "Cancelled",
+    "completed-browser": "Handed to browser",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "show-in-folder": "Show in folder",
+    "open-folder": "Open downloads folder",
+    "clear-finished": "Clear finished"
   }
 }

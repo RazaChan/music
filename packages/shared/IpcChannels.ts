@@ -37,6 +37,11 @@ export const enum IpcChannels {
   SyncAccentColor = 'SyncAccentColor',
   GetAudioCacheSize = 'GetAudioCacheSize',
   ClearAudioCache = 'ClearAudioCache',
+  DownloadAudioToDisk = 'DownloadAudioToDisk',
+  CancelAudioDownload = 'CancelAudioDownload',
+  AudioDownloadProgress = 'AudioDownloadProgress',
+  ShowItemInFolder = 'ShowItemInFolder',
+  OpenDownloadsFolder = 'OpenDownloadsFolder',
   ResetWindowSize = 'ResetWindowSize',
   GetAlbumFromAppleMusic = 'GetAlbumFromAppleMusic',
   GetArtistFromAppleMusic = 'GetArtistFromAppleMusic',
@@ -106,6 +111,23 @@ export interface IpcChannelsParams {
   }
   [IpcChannels.GetAudioCacheSize]: void
   [IpcChannels.ClearAudioCache]: void
+  [IpcChannels.DownloadAudioToDisk]: {
+    id: number
+    url: string
+    filename: string
+  }
+  [IpcChannels.CancelAudioDownload]: {
+    id: number
+  }
+  [IpcChannels.AudioDownloadProgress]: {
+    id: number
+    loaded: number
+    total: number
+  }
+  [IpcChannels.ShowItemInFolder]: {
+    path: string
+  }
+  [IpcChannels.OpenDownloadsFolder]: void
   [IpcChannels.ResetWindowSize]: void
   [IpcChannels.GetAlbumFromAppleMusic]: {
     id: number
@@ -165,6 +187,17 @@ export interface IpcChannelsReturns {
   }
   [IpcChannels.GetAudioCacheSize]: string
   [IpcChannels.ClearAudioCache]: void
+  [IpcChannels.DownloadAudioToDisk]: {
+    path: string
+  }
+  [IpcChannels.CancelAudioDownload]: void
+  [IpcChannels.AudioDownloadProgress]: {
+    id: number
+    loaded: number
+    total: number
+  }
+  [IpcChannels.ShowItemInFolder]: void
+  [IpcChannels.OpenDownloadsFolder]: void
   [IpcChannels.ResetWindowSize]: void
   [IpcChannels.GetAlbumFromAppleMusic]: AppleMusicAlbum | undefined
   [IpcChannels.GetArtistFromAppleMusic]: AppleMusicArtist | undefined

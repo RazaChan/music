@@ -409,3 +409,33 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 
 - 缓存命中响应的 `source` 字段（netease/youtube/unknown）目前只进 player.audioQuality，徽标暂不展示来源——留待后续按需展示
 - 移动端播放器无音质徽标（空间受限，桌面优先）
+
+## 15. 阶段 2 第三批落地记录（2026-11-27）—— 显式下载管理（阶段 2 完成）
+
+### 交付内容
+
+**真实格式文件名**：`download.ts` 重写——扩展名取音源响应的 `type`（真实编码），缺失时从 URL 推断，兜底 mp3；不再一律 `.mp3`。请求带 `settings.audioQuality` 档位。
+
+**任务管理（`states/downloads.ts`，valtio）**：任务以 trackID 为键（同曲目去重），状态机 downloading/completed/failed/cancelled，进度 loaded/total，完成后记录 savedPath。纯函数动作（upsert/progress/status/clear）有 7 个单测。
+
+**桌面端（主进程流式下载）**：新增 `main/downloader.ts`——Electron `net.request` 流式写盘到 `userData/downloads`，PassThrough 计数 + 200ms 节流推送 `AudioDownloadProgress` IPC；取消经 `CancelAudioDownload` → abort + 清理部分文件；完成可 `ShowItemInFolder` 定位 / `OpenDownloadsFolder` 打开目录。文件名经 `sanitizeDownloadFilename`（控制字符/保留字符/结尾点/长度）+ `resolveDownloadPath`（目录逃逸兜底）双重校验，9 个单测。**红线同款模式：校验先于任何 fs 写操作。**
+
+**Web 端**：fetch reader 流式读取（进度可见）→ blob → 浏览器接管保存；AbortController 取消；跨域失败退化为裸链（标记完成）。进度经 `ipcRenderer.ts` 的 AudioDownloadProgress 监听进 store（桌面）。
+
+**UI**：顶栏新增下载按钮（进行中任务数角标）+ 任务面板（进度条 / 取消 / 重试 / 打开所在文件夹[桌面] / 打开下载目录[桌面] / 清空已完成）。i18n 新增 `downloads` 节。
+
+### 验证
+
+- 单测：web **12 文件 / 109 用例**（+downloads 7）、desktop **6 文件 / 40 用例**（+downloadFilename 9）全绿
+- 类型：web 0 error；desktop 34 基线（Electron IncomingMessage 类型不完整需 as Readable，已注）；lint 零新增
+- CDP 冒烟 **29/29**：新增场景 6——桌面视口下顶栏下载按钮渲染、面板展开空态
+- 冒烟经验（两条，后续写脚本注意）：
+  1. **headless Edge 默认窗口宽 750px ≤ 768 断点 → 落入移动布局**，桌面顶栏类断言必须先 `setDeviceMetricsOverride`
+  2. **应用布局在文档加载时定型**（useIsMobile 非响应式），改视口后 hash 导航不会重挂载——需带 query 强制整页重载
+
+### 阶段 2 完成度对照
+
+- ✅ 音质：选择器 + 实际音质展示 + 权益降级如实上报（§14）
+- ✅ 自动缓存：缓存键含音质、真实 Range、queriedAt/LRU 地基、容量可见与清理入口（§13）
+- ✅ 显式下载：任务列表、进度、取消、重试、真实格式、存储位置与文件定位（本节）
+- ⏭ 桌面离线播放：缓存 + 下载均已落盘，离线识别与展示留待后续批次（路线图中本就是"以上稳定后"）
