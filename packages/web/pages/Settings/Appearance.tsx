@@ -1,16 +1,43 @@
 import settings from '@/web/states/settings'
 import { useSnapshot } from 'valtio'
 import { cx, css } from '@emotion/css'
-import { Option, OptionText, Switch } from './Controls'
+import { Option, OptionText, Select, Switch } from './Controls'
 import { useTranslation } from 'react-i18next'
 import AccentColor from '@/web/components/Appearence/AccentColor'
 import persistedUiStates from '@/web/states/persistedUiStates'
+import { changeTheme, resolveTheme } from '@/web/utils/theme'
+import { syncTheme } from '@/web/utils/ipcRender'
+
+type ThemeSetting = 'dark' | 'light' | 'system'
 
 const Theme = () => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
+  const { theme } = useSnapshot(settings)
+
+  const options: { name: string; value: ThemeSetting }[] = [
+    { name: t`settings.theme-dark`, value: 'dark' },
+    { name: t`settings.theme-light`, value: 'light' },
+    { name: t`settings.theme-system`, value: 'system' },
+  ]
+
   return (
     <>
       <div className='text-xl font-medium text-gray-800 dark:text-white'>{t`settings.theme`}</div>
+      {/* 深浅色/跟随系统 —— 移动端唯一的主题切换入口（顶栏切换按钮是桌面专属） */}
+      <Option>
+        <OptionText>{t`settings.theme-mode`}</OptionText>
+        <div data-testid='settings-theme-mode'>
+          <Select
+            options={options}
+            value={(['dark', 'light', 'system'].includes(theme) ? theme : 'dark') as ThemeSetting}
+            onChange={value => {
+              settings.theme = value
+              changeTheme(resolveTheme(value))
+              syncTheme(value)
+            }}
+          />
+        </div>
+      </Option>
       <AccentColor />
     </>
   )

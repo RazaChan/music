@@ -162,7 +162,11 @@
     "quality-standard": "Standard 128K",
     "quality-exhigh": "Extreme 320K",
     "quality-lossless": "Lossless",
-    "quality-hires": "Hi-Res"
+    "quality-hires": "Hi-Res",
+    "theme-mode": "Appearance",
+    "theme-dark": "Dark",
+    "theme-light": "Light",
+    "theme-system": "System"
   },
   "context-menu": {
     "share": "Share",

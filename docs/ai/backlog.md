@@ -461,3 +461,20 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 - 跨断点切换会重挂载 Layout（页面局部 state/滚动位置重置）——低频操作，可接受
 - 769–1023 的移动布局在大屏上偏稀疏（内容拉伸）——第三批组件收敛时处理容器宽度
 - 移动布局底栏高度与 `-132px` 的减法近似抵消，未做精确的布局变量（第三批）
+
+## 17. 阶段 3 第二批落地记录（2026-11-27）—— 移动端导航完整性
+
+### 交付内容
+
+**移动顶栏全页面化**：此前 `TopbarMobile` 只在 `/` 渲染——Discover/Browse/Search/Settings/详情页都没有搜索、设置和用户入口。现在除 `/lyrics`（沉浸页）外全页面渲染；二级页面（非 `/` `/discover` `/browse` `/lyrics`）顶栏左侧显示返回按钮（`navigate(-1)`）。
+
+**主题三态（Light / Dark / System）**：
+- `resolveTheme()`：设置值（含 `system`）→ 实际主题；`theme.ts` 模块级订阅 `prefers-color-scheme` change，跟随系统时即时切换（直接读 localStorage，避免在 store 初始化前引入依赖）
+- Settings → Appearance 新增「外观模式」Select（深色/浅色/跟随系统）——移动端唯一的主题切换入口（顶栏太阳按钮是桌面专属）
+- 桌面顶栏切换按钮改为按解析后的实际主题取反（system 状态下行为可预期）
+- IPC `SyncTheme` 统一经 `resolveTheme` 应用
+
+### 验证
+
+- 单测 109 全绿；`test:types` 0 error；lint 零新增（TopbarMobile 2→0、Appearance 7→6）
+- CDP 冒烟 **39/39**：新增场景 8——Discover 页有顶栏（此前仅首页）、一级页无返回按钮、设置页有返回且点击回到上一页、主题切"跟随系统"持久化且 body class 已解析为具体主题

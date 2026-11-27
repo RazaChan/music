@@ -3,7 +3,7 @@ import { IpcChannels, IpcChannelsReturns, IpcChannelsParams } from '@/shared/Ipc
 import uiStates from './states/uiStates'
 import settings from './states/settings'
 import toast from 'react-hot-toast'
-import { changeAccentColor, changeTheme } from './utils/theme'
+import { changeAccentColor, changeTheme, resolveTheme } from './utils/theme'
 import { updateDownloadProgress } from './states/downloads'
 import { RepeatMode } from '@/shared/playerDataTypes'
 
@@ -44,7 +44,7 @@ export function ipcRenderer() {
   })
 
   on(IpcChannels.SyncTheme, (e, { theme }) => {
-    changeTheme(theme as 'light' | 'dark')
+    changeTheme(resolveTheme(theme))
   })
 
   on(IpcChannels.Next, e => {

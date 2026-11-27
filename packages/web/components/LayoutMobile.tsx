@@ -33,7 +33,8 @@ const LayoutMobile = () => {
       ) : (
         <>
           <main id='main' className='min-h-screen overflow-y-auto overflow-x-hidden pb-16 '>
-            {location.pathname === '/' && <Topbar />}
+            {/* 顶栏全页面可达（搜索/设置/返回）；歌词页保持沉浸不放顶栏 */}
+            {location.pathname !== '/lyrics' && <Topbar />}
             <Router />
           </main>
           <div

@@ -28,6 +28,7 @@ interface Settings {
   showBackgroundImage: boolean
   /** 请求的音源音质档位；上游会按账号权益自动降级，实际档位以响应为准 */
   audioQuality: 'standard' | 'higher' | 'exhigh' | 'lossless' | 'hires'
+  /** 'dark' | 'light' | 'system'（跟随系统经 resolveTheme 解析） */
   theme: string
   showDesktopLyrics: boolean
   keyboardShortcuts: KeyboardShortcutSettings
