@@ -32,7 +32,9 @@
     "error": "Failed to load",
     "retry": "Retry",
     "please-login-hint": "Log in to see your music",
-    "alternative-source": "Alternative source"
+    "alternative-source": "Alternative source",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   },
   "navigation": {
     "goBack": "Go back",
@@ -76,7 +78,11 @@
     "removed-from-library": "Removed from library",
     "removed-from-playlist": "Removed from playlist",
     "download-started": "Download started",
-    "download-failed": "Download failed (no available audio source)"
+    "download-failed": "Download failed (no available audio source)",
+    "playlist-created": "Playlist created",
+    "playlist-renamed": "Playlist renamed",
+    "playlist-deleted": "Playlist deleted",
+    "playlist-manage-failed": "Operation failed, try again later"
   },
   "search": {
     "search": "Search",
@@ -226,5 +232,15 @@
     "direction-instrumental": "Instrumental",
     "refresh": "Shuffle",
     "play-all": "Play"
+  },
+  "playlist": {
+    "create": "New playlist",
+    "create-title": "New playlist",
+    "create-placeholder": "Playlist name",
+    "rename": "Rename",
+    "rename-title": "Rename playlist",
+    "delete": "Delete",
+    "delete-title": "Delete playlist?",
+    "delete-description": "This cannot be undone. The playlist will be removed from your account."
   }
 }

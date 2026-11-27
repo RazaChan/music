@@ -3,7 +3,7 @@ import useUserArtists from '@/web/api/hooks/useUserArtists'
 import Tabs from '@/web/components/Tabs'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import CoverRow from '@/web/components/CoverRow'
-import useUserPlaylists from '@/web/api/hooks/useUserPlaylists'
+import useUserPlaylists, { useMutationCreatePlaylist } from '@/web/api/hooks/useUserPlaylists'
 import useUserAlbums from '@/web/api/hooks/useUserAlbums'
 import { useSnapshot } from 'valtio'
 import uiStates from '@/web/states/uiStates'
@@ -22,6 +22,7 @@ import Icon from '@/web/components/Icon'
 import FileUploader from '@/web/components/Tools/Upload'
 import CoverWall from '@/web/components/CoverWall'
 import { IconNames } from '@/web/components/Icon/iconNamesType'
+import { InputDialog } from '@/web/components/Dialogs'
 import Recent from './Recent'
 
 const collections = ['daily', 'playlists', 'albums', 'artists', 'videos', 'cloud','recent'] as const
@@ -33,8 +34,11 @@ const Albums = () => {
 }
 
 const Playlists = () => {
+  const { t } = useTranslation()
   const user = useUser()
   const { data: playlists } = useUserPlaylists()
+  const createPlaylist = useMutationCreatePlaylist()
+  const [showCreate, setShowCreate] = useState(false)
   const myPlaylists = useMemo(
     () => playlists?.playlist?.slice(1).filter(p => p.userId === user?.data?.account?.id),
     [playlists, user]
@@ -49,8 +53,16 @@ const Playlists = () => {
       {/* My playlists */}
       {myPlaylists && (
         <>
-          <div className='mb-4 mt-2 text-14 font-medium uppercase text-neutral-400'>
-            Created BY ME
+          <div className='mb-4 mt-2 flex items-center justify-between'>
+            <div className='text-14 font-medium uppercase text-neutral-400'>Created BY ME</div>
+            <button
+              data-testid='playlist-create'
+              onClick={() => setShowCreate(true)}
+              className='flex items-center gap-1 rounded-full bg-black/5 px-3 py-1.5 text-12 font-bold text-black/60 transition-colors hover:bg-black/10 dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10'
+            >
+              <Icon name='plus' className='h-3.5 w-3.5' />
+              {t`playlist.create`}
+            </button>
           </div>
           <CoverRow playlists={myPlaylists || []} />
         </>
@@ -64,6 +76,13 @@ const Playlists = () => {
           <CoverRow playlists={otherPlaylists || []} />
         </>
       )}
+      <InputDialog
+        open={showCreate}
+        title={t`playlist.create-title`}
+        placeholder={t`playlist.create-placeholder`}
+        onClose={() => setShowCreate(false)}
+        onSubmit={name => createPlaylist.mutate(name)}
+      />
     </div>
   )
 }

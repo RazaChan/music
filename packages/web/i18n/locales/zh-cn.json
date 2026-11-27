@@ -32,7 +32,9 @@
     "error": "加载失败",
     "retry": "重试",
     "please-login-hint": "登录后查看你的音乐",
-    "alternative-source": "替代音源"
+    "alternative-source": "替代音源",
+    "cancel": "取消",
+    "confirm": "确定"
   },
   "navigation": {
     "goBack": "返回",
@@ -76,7 +78,11 @@
     "removed-from-library": "已从音乐库中移除",
     "removed-from-playlist": "已从歌单中移除",
     "download-started": "开始下载",
-    "download-failed": "下载失败（可能无可用音源）"
+    "download-failed": "下载失败（可能无可用音源）",
+    "playlist-created": "歌单已创建",
+    "playlist-renamed": "歌单已重命名",
+    "playlist-deleted": "歌单已删除",
+    "playlist-manage-failed": "操作失败，请稍后再试"
   },
   "search": {
     "search": "搜索",
@@ -226,5 +232,15 @@
     "direction-instrumental": "纯音乐",
     "refresh": "换一批",
     "play-all": "播放"
+  },
+  "playlist": {
+    "create": "新建歌单",
+    "create-title": "新建歌单",
+    "create-placeholder": "歌单名称",
+    "rename": "重命名",
+    "rename-title": "重命名歌单",
+    "delete": "删除",
+    "delete-title": "删除歌单？",
+    "delete-description": "此操作不可撤销，歌单将从你的账号中删除。"
   }
 }

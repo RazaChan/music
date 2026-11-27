@@ -573,3 +573,22 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 
 - 单测 119 全绿；`test:types` 0 error；lint 零新增
 - CDP 冒烟 **49/49**：新增场景 11——页头渲染（7 方向 + 换一批 + 播放）、切"华语"经真实 top/playlist 到达定义态、换一批后仍定义态
+
+## 22. 阶段 4 第三批落地记录（2026-11-27）—— 歌单管理
+
+### 交付内容
+
+**API 与 mutations**：`createPlaylist` / `deletePlaylist` / `updatePlaylistName` 封装（上游 `/playlist/create|delete|name/update`，代理自动注册无需服务端改动）；三个 mutation 成功后失效用户歌单查询（重命名同时失效歌单详情），toast 反馈。
+
+**对话框原语**（`components/Dialogs.tsx`）：`InputDialog`（新建/重命名共用：自动聚焦全选、Enter 提交、空值禁提交、Escape/背板关闭）与 `ConfirmDialog`（破坏性操作红色确认）——`role="dialog" aria-modal`，供后续批次复用。
+
+**UI**：
+- Collections → Playlists → "Created BY ME" 区新增「新建歌单」按钮
+- 歌单详情页：`TrackListHeader` 新增 `extraActions` 扩展位（Like 按钮后），仅创建者渲染「重命名 / 删除」；删除确认后返回首页
+- 所有权判定复用既有逻辑（`account.id === creator.userId`，与隐藏 Like 按钮同一条件）
+
+### 验证
+
+- 单测 119 全绿；`test:types` 0 error；lint 零新增（Collections 10→8）
+- CDP 冒烟 **50/50**：新增场景 12——未登录查看公共歌单页正常渲染且无管理按钮（权限门）
+- **未覆盖**：新建/重命名/删除的真实链路需要登录账号，留待人工验证（对话框与 mutation 均为薄封装，风险低）

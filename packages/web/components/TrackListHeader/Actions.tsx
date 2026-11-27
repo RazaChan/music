@@ -12,17 +12,20 @@ const Actions = ({
   onLike,
   isLiked,
   isLoading,
+  extraActions,
 }: {
   isLiked?: boolean
   isLoading?: boolean
   onPlay: () => void
   onLike?: () => void
+  extraActions?: React.ReactNode
 }) => {
   return (
     <div className='mt-11 flex items-end justify-between lg:mt-4 lg:justify-start lg:gap-2.5'>
       <div className='flex items-end gap-2.5'>
         <MenuButton isLoading={isLoading} />
         <LikeButton {...{ isLiked, isLoading, onLike }} />
+        {extraActions}
       </div>
       <PlayButton onPlay={onPlay} isLoading={isLoading} />
     </div>

@@ -124,3 +124,40 @@ export function addSongToPlayList(
     },
   })
 }
+
+// 新建歌单
+export function createPlaylist(name: string): Promise<{ code: number; playlist?: { id: number } }> {
+  return request({
+    url: '/playlist/create',
+    method: 'post',
+    params: {
+      name,
+      timestamp: Date.now(),
+    },
+  })
+}
+
+// 删除歌单（仅自建歌单）
+export function deletePlaylist(id: number): Promise<{ code: number }> {
+  return request({
+    url: '/playlist/delete',
+    method: 'post',
+    params: {
+      id,
+      timestamp: Date.now(),
+    },
+  })
+}
+
+// 重命名歌单（仅自建歌单）
+export function updatePlaylistName(id: number, name: string): Promise<{ code: number }> {
+  return request({
+    url: '/playlist/name/update',
+    method: 'post',
+    params: {
+      id,
+      name,
+      timestamp: Date.now(),
+    },
+  })
+}

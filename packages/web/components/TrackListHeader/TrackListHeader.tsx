@@ -17,6 +17,8 @@ interface Props {
   isLiked: boolean
   onPlay: () => void
   onLike?: () => void
+  /** 追加在 Like 按钮后的操作位（如歌单管理的重命名/删除） */
+  extraActions?: React.ReactNode
 }
 
 const TrackListHeader = ({
@@ -32,6 +34,7 @@ const TrackListHeader = ({
   isLiked,
   onPlay,
   onLike,
+  extraActions,
 }: Props) => {
   return (
     <div
@@ -59,7 +62,7 @@ const TrackListHeader = ({
             isLoading,
           }}
         />
-        <Actions {...{ onPlay, onLike, isLiked, isLoading }} />
+        <Actions {...{ onPlay, onLike, isLiked, isLoading, extraActions }} />
       </div>
     </div>
   )

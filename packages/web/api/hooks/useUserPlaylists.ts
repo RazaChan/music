@@ -1,4 +1,10 @@
-import { fetchPlaylist, likeAPlaylist } from '@/web/api/playlist'
+import {
+  createPlaylist,
+  deletePlaylist,
+  fetchPlaylist,
+  likeAPlaylist,
+  updatePlaylistName,
+} from '@/web/api/playlist'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import useUser from './useUser'
 import { IpcChannels } from '@/shared/IpcChannels'
@@ -6,6 +12,7 @@ import { CacheAPIs } from '@/shared/CacheAPIs'
 import { fetchUserPlaylists } from '@/web/api/user'
 import { FetchUserPlaylistsResponse, UserApiNames } from '@/shared/api/User'
 import toast from 'react-hot-toast'
+import i18n from '@/web/i18n/i18n'
 import reactQueryClient from '@/web/utils/reactQueryClient'
 import { cloneDeep } from 'lodash-es'
 import { FetchPlaylistResponse, PlaylistApiNames } from '@/shared/api/Playlists'
@@ -123,5 +130,59 @@ export const useMutationLikeAPlaylist = () => {
         toast((error as any).toString())
       }
     },
+  })
+}
+
+// ── 歌单管理（新建 / 重命名 / 删除自建歌单）──────────────────────────────
+
+export const useMutationCreatePlaylist = () => {
+  const { data: user } = useUser()
+  const uid = user?.account?.id ?? 0
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const response = await createPlaylist(name)
+      if (response?.code !== 200) throw new Error(`create playlist failed: ${response?.code}`)
+      return response
+    },
+    onSuccess: () => {
+      reactQueryClient.invalidateQueries({ queryKey: [UserApiNames.FetchUserPlaylists, uid] })
+      toast.success(i18n.t('toasts.playlist-created'))
+    },
+    onError: () => toast.error(i18n.t('toasts.playlist-manage-failed')),
+  })
+}
+
+export const useMutationRenamePlaylist = () => {
+  const { data: user } = useUser()
+  const uid = user?.account?.id ?? 0
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const response = await updatePlaylistName(id, name)
+      if (response?.code !== 200) throw new Error(`rename playlist failed: ${response?.code}`)
+      return response
+    },
+    onSuccess: (_data, { id }) => {
+      reactQueryClient.invalidateQueries({ queryKey: [UserApiNames.FetchUserPlaylists, uid] })
+      reactQueryClient.invalidateQueries({ queryKey: [PlaylistApiNames.FetchPlaylist, { id }] })
+      toast.success(i18n.t('toasts.playlist-renamed'))
+    },
+    onError: () => toast.error(i18n.t('toasts.playlist-manage-failed')),
+  })
+}
+
+export const useMutationDeletePlaylist = () => {
+  const { data: user } = useUser()
+  const uid = user?.account?.id ?? 0
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await deletePlaylist(id)
+      if (response?.code !== 200) throw new Error(`delete playlist failed: ${response?.code}`)
+      return response
+    },
+    onSuccess: () => {
+      reactQueryClient.invalidateQueries({ queryKey: [UserApiNames.FetchUserPlaylists, uid] })
+      toast.success(i18n.t('toasts.playlist-deleted'))
+    },
+    onError: () => toast.error(i18n.t('toasts.playlist-manage-failed')),
   })
 }
