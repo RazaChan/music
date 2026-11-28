@@ -614,3 +614,21 @@ Artist 头部的占位原本就是隐形骨架（text-transparent），未动；
 - ✅ 歌单管理：新建 / 重命名 / 删除（§22，真实链路待登录人工验证）
 - ✅ 继续收听：恢复上下文（阶段 1）+ 可见入口与回来源页（本节）
 - ⏭ 本地文件库：按路线图约定"真实需求验证后再评估"
+
+## 24. 阶段 5 第一批落地记录（2026-11-28）—— 桌面歌词能力对齐
+
+### 交付内容
+
+**桌面歌词窗复用主歌词页能力**（`LyricsDesktop.tsx`）：
+- **YRC 逐词 karaoke**：有逐字歌词时以 YRC 行为行跟踪与渲染基准（与主歌词页同源逻辑）；仅活跃行挂载 word spans，RAF 循环直改 `--p` CSS 变量（零 React 逐帧渲染），复用全局 `.lyric-word` / `.lyrics-row--active` 门控样式
+- **罗马音**：`romalrc` 作为主歌词与翻译之间的次级行（两种模式下都显示）
+- 行组件新增 `lyrics-row--active` 门控类（karaoke 渐变的作用域开关）
+- 保留既有性能设计：memo 行、二分查找、RAF 行跟踪（歌词窗进度经 IPC SyncProgress 驱动）
+
+**共享组件抽取**：`YrcWordSpan` 从 Lyrics.tsx 抽为 `components/Lyrics/YrcWordSpan.tsx`，主歌词页与桌面歌词窗共用（纯展示组件，零行为变化）。
+
+### 验证
+
+- 单测 119 全绿；`test:types` 0 error；lint 零新增
+- CDP 冒烟 **54/54**：新增场景 14——`#/desktoplyrics` 真实歌词 API 渲染 35 行、活跃行唯一且带 karaoke 门控类
+- 逐词填充的实际观感（YRC 曲目 + 播放中）留待桌面端人工确认——headless 无法驱动真实音频进度
