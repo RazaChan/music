@@ -104,7 +104,8 @@
   "my": {
     "xxxs-liked-tracks": "{{nickname}}'s Liked Tracks",
     "playNow": "Play Now",
-    "recently-listened": "RECENTLY LISTENED"
+    "recently-listened": "RECENTLY LISTENED",
+    "continue-listening": "Continue listening"
   },
   "settings": {
     "settings": "Settings",

@@ -104,7 +104,8 @@
   "my": {
     "xxxs-liked-tracks": "{{nickname}}喜欢的音乐",
     "playNow": "立即播放",
-    "recently-listened": "最近播放"
+    "recently-listened": "最近播放",
+    "continue-listening": "继续收听"
   },
   "settings": {
     "settings": "设置",

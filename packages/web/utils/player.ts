@@ -374,7 +374,14 @@ export class Player {
     const id = this.trackID
     if (!id) return
     this.state = State.Loading
-    const track = await this._fetchTrack(id)
+    // fetch 抛错（网络/上游 500）与返回空同样处理 —— 本方法常被
+    // fire-and-forget 调用，未捕获的 rejection 会变成全局未处理异常
+    let track: Track | null = null
+    try {
+      track = await this._fetchTrack(id)
+    } catch {
+      track = null
+    }
     if (!track) {
       toast('加载歌曲信息失败')
       // 不能停留在 Loading —— 那会让 UI 永久卡在加载态
